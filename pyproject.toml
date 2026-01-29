@@ -1,0 +1,43 @@
+[project]
+name = "confluence-refiner"
+version = "0.1.0"
+description = "A system to refine Confluence documentation using AI agents."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "httpx>=0.24.0",
+    "chromadb>=0.4.0",
+    "pydantic>=2.0.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pyright>=1.1.300",
+    "flake8>=6.0.0",
+    "httpx>=0.24.0", # For TestClient
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/node_modules", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false # Often annoying with some libs, but strict mode might require it. I'll keep it false for now to avoid blocking on missing stubs for libs like chromadb if they don't have them.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
