@@ -1,6 +1,7 @@
 import os
-from typing import List, Optional
+from typing import List, Optional, Any, cast, Dict
 import chromadb
+from chromadb.api.types import OneOrMany, Metadata, Where
 from ..models import ConfluencePage
 
 CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./chroma_db")
@@ -20,21 +21,35 @@ def _get_collection():
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
     """
-    Splits text into chunks with overlap.
+    Splits text into chunks with overlap, respecting word boundaries.
     """
     if not text:
         return []
 
-    chunks = []
+    chunks: List[str] = []
     start = 0
     text_len = len(text)
 
     while start < text_len:
         end = min(start + chunk_size, text_len)
-        chunks.append(text[start:end])
+
+        # If not at the end, try to find a suitable break point (whitespace)
+        if end < text_len:
+            segment = text[start:end]
+            last_space = segment.rfind(' ')
+            if last_space != -1:
+                end = start + last_space
+
+        # Force break if no progress (e.g. huge word)
+        if end <= start:
+            end = min(start + chunk_size, text_len)
+
+        chunks.append(text[start:end].strip())
+
         if end == text_len:
             break
-        start += chunk_size - overlap
+
+        start = max(start + 1, end - overlap)
 
     return chunks
 
@@ -50,7 +65,9 @@ def ingest_page(page: ConfluencePage) -> None:
 
     # Delete existing entries for this page to avoid duplicates/stale chunks
     try:
-        collection.delete(where={"page_id": page.id})
+        # We need to cast the dictionary to the Where type expected by ChromaDB
+        where_clause = cast(Where, {"page_id": page.id})
+        collection.delete(where=where_clause)
     except Exception:
         # Might fail if collection empty or other issues, but usually fine.
         pass
@@ -58,7 +75,9 @@ def ingest_page(page: ConfluencePage) -> None:
     chunks = chunk_text(page.body)
 
     ids = [f"{page.id}_chunk_{i}" for i in range(len(chunks))]
-    metadatas = [
+
+    # Create metadata dictionaries
+    metadatas_list: List[Dict[str, Any]] = [
         {
             "page_id": page.id,
             "title": page.title,
@@ -68,6 +87,9 @@ def ingest_page(page: ConfluencePage) -> None:
         }
         for i in range(len(chunks))
     ]
+
+    # Cast to what Chroma expects
+    metadatas = cast(OneOrMany[Metadata], metadatas_list)
 
     if chunks:
         collection.upsert(
@@ -91,9 +113,9 @@ def query_context(text: str, n_results: int = 3, exclude_page_id: Optional[str] 
     """
     collection = _get_collection()
 
-    where_filter = None
+    where_filter: Optional[Where] = None
     if exclude_page_id:
-        where_filter = {"page_id": {"$ne": exclude_page_id}}
+        where_filter = cast(Where, {"page_id": {"$ne": exclude_page_id}})
 
     results = collection.query(
         query_texts=[text],
@@ -103,5 +125,9 @@ def query_context(text: str, n_results: int = 3, exclude_page_id: Optional[str] 
 
     if results and results.get("documents"):
         # results['documents'] is a List[List[str]] (one list per query)
-        return results["documents"][0]  # type: ignore
+        docs = results["documents"]
+        if docs and len(docs) > 0:
+            # Pyright sees docs[0] as List[Document] which is List[str]
+            return docs[0]  # type: ignore
+
     return []
