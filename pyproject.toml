@@ -15,15 +15,6 @@ dependencies = [
     "tenacity>=8.0.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pyright>=1.1.300",
-    "flake8>=6.0.0",
-    "httpx>=0.24.0", # For TestClient
-]
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -35,7 +26,7 @@ venvPath = "."
 venv = ".venv"
 typeCheckingMode = "strict"
 reportMissingImports = true
-reportMissingTypeStubs = false # Often annoying with some libs, but strict mode might require it. I'll keep it false for now to avoid blocking on missing stubs for libs like chromadb if they don't have them.
+reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -44,7 +35,9 @@ asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
-    "pytest>=8.4.2",
-    "pytest-asyncio>=1.2.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pyright>=1.1.300",
+    "flake8>=6.0.0",
+    "httpx>=0.24.0",
 ]

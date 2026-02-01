@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Any, cast
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 from ..models import ConfluencePage
@@ -120,3 +120,58 @@ async def get_pages_from_space(space_key: str, limit: int = 50) -> List[Confluen
             start += len(results)
 
     return pages
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+async def update_page(page_id: str, title: str, body: str, version_number: int) -> ConfluencePage:
+    """
+    Updates a Confluence page with new content.
+
+    Args:
+        page_id: The ID of the page to update.
+        title: The new title of the page.
+        body: The new storage format body.
+        version_number: The current version number (will be incremented).
+
+    Returns:
+        ConfluencePage: The updated page model.
+    """
+    url = f"{CONFLUENCE_URL}/rest/api/content/{page_id}"
+
+    payload = {
+        "id": page_id,
+        "type": "page",
+        "title": title,
+        "body": {
+            "storage": {
+                "value": body,
+                "representation": "storage"
+            }
+        },
+        "version": {
+            "number": version_number + 1
+        }
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            url,
+            auth=cast(Any, _get_auth()),
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            json=payload,
+            timeout=10.0
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        space_key = data.get("space", {}).get("key", "UNKNOWN")
+        webui = data.get("_links", {}).get("webui", "")
+
+        return ConfluencePage(
+            id=data["id"],
+            title=data["title"],
+            body=data["body"]["storage"]["value"],
+            space_key=space_key,
+            version=data["version"]["number"],
+            url=f"{CONFLUENCE_URL}{webui}"
+        )
