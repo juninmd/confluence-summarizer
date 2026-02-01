@@ -65,3 +65,37 @@ async def ingest_space(space_key: str, background_tasks: BackgroundTasks):
     """
     background_tasks.add_task(process_space_ingestion, space_key)
     return {"message": f"Ingestion started for space {space_key}"}
+
+
+@app.post("/publish/{page_id}")
+async def publish_page(page_id: str):
+    """
+    Publishes the refined content to Confluence.
+    """
+    if page_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    result = jobs[page_id]
+
+    if result.status != RefinementStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail=f"Job status is {result.status}, cannot publish")
+
+    if not result.rewritten_content:
+        raise HTTPException(status_code=400, detail="No rewritten content available")
+
+    # Fetch current page to get version
+    # Note: In a real scenario we should have stored the version or handle optimistic locking.
+    # For now, we fetch fresh.
+    try:
+        current_page = await confluence.get_page(page_id)
+
+        await confluence.update_page(
+            page_id=page_id,
+            title=current_page.title,  # Keep original title for now
+            body=result.rewritten_content,
+            version_number=current_page.version
+        )
+
+        return {"message": "Page published successfully", "page_id": page_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to publish: {str(e)}")

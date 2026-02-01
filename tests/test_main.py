@@ -56,3 +56,49 @@ def test_get_status_found(mock_confluence_get_page, mock_refine_page):
     response = client.get("/status/456")
     assert response.status_code == 200
     assert response.json()["status"] == "processing"
+
+
+@pytest.fixture
+def mock_confluence_update_page():
+    with patch("confluence_refiner.services.confluence.update_page", new_callable=AsyncMock) as mock:
+        yield mock
+
+
+def test_publish_page_success(mock_confluence_get_page, mock_confluence_update_page):
+    from confluence_refiner.main import jobs
+
+    # Setup job
+    jobs["789"] = RefinementResult(
+        page_id="789",
+        original_content="Org",
+        status=RefinementStatus.COMPLETED,
+        rewritten_content="New Content"
+    )
+
+    # Setup mocks
+    mock_confluence_get_page.return_value = ConfluencePage(
+        id="789", title="Page", body="Org", space_key="S", version=1, url="url"
+    )
+    mock_confluence_update_page.return_value = ConfluencePage(
+        id="789", title="Page", body="New Content", space_key="S", version=2, url="url"
+    )
+
+    response = client.post("/publish/789")
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Page published successfully"
+    mock_confluence_update_page.assert_called_once()
+
+
+def test_publish_page_not_found():
+    response = client.post("/publish/999")
+    assert response.status_code == 404
+
+
+def test_publish_page_not_completed():
+    from confluence_refiner.main import jobs
+    jobs["888"] = RefinementResult(
+        page_id="888", original_content="Org", status=RefinementStatus.PROCESSING
+    )
+    response = client.post("/publish/888")
+    assert response.status_code == 400
