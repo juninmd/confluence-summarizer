@@ -1,35 +1,41 @@
-from typing import Dict
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from .models import RefinementResult, RefinementStatus
 from .services import confluence, rag
 from .agents import refine_page
+from . import db
 
-app = FastAPI(title="Confluence Refiner")
 
-# In-memory job store (replace with Redis/DB in production)
-jobs: Dict[str, RefinementResult] = {}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await db.init_db()
+    yield
+
+
+app = FastAPI(title="Confluence Refiner", lifespan=lifespan)
 
 
 async def process_refinement(page_id: str):
     try:
         page = await confluence.get_page(page_id)
         result = await refine_page(page)
-        jobs[page_id] = result
+        await db.save_job(result)
     except Exception as e:
         # Update job with error
-        jobs[page_id] = RefinementResult(
+        result = RefinementResult(
             page_id=page_id,
             original_content="",
             status=RefinementStatus.FAILED,
             reviewer_comments=str(e)
         )
+        await db.save_job(result)
 
 
 async def process_space_ingestion(space_key: str):
     try:
         pages = await confluence.get_pages_from_space(space_key)
         for page in pages:
-            rag.ingest_page(page)
+            await rag.ingest_page(page)
     except Exception as e:
         print(f"Error ingesting space {space_key}: {e}")
 
@@ -39,11 +45,12 @@ async def start_refinement(page_id: str, background_tasks: BackgroundTasks):
     """
     Starts a refinement job for a specific page.
     """
-    jobs[page_id] = RefinementResult(
+    job = RefinementResult(
         page_id=page_id,
         original_content="",
         status=RefinementStatus.PROCESSING
     )
+    await db.save_job(job)
     background_tasks.add_task(process_refinement, page_id)
     return {"message": "Refinement job started", "page_id": page_id}
 
@@ -53,9 +60,10 @@ async def get_status(page_id: str):
     """
     Checks the status of a refinement job.
     """
-    if page_id not in jobs:
+    job = await db.get_job(page_id)
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return jobs[page_id]
+    return job
 
 
 @app.post("/ingest/space/{space_key}")
@@ -72,10 +80,9 @@ async def publish_page(page_id: str):
     """
     Publishes the refined content to Confluence.
     """
-    if page_id not in jobs:
+    result = await db.get_job(page_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Job not found")
-
-    result = jobs[page_id]
 
     if result.status != RefinementStatus.COMPLETED:
         raise HTTPException(status_code=400, detail=f"Job status is {result.status}, cannot publish")

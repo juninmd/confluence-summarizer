@@ -10,10 +10,10 @@ async def refine_page(page: ConfluencePage) -> RefinementResult:
     # 1. Retrieve Context (similar pages that might contradict or support)
     # We query BEFORE ingesting the current page to avoid retrieving the page itself as context
     # (assuming we want to check against existing knowledge).
-    context_docs = rag.query_context(page.body, exclude_page_id=page.id)
+    context_docs = await rag.query_context(page.body, exclude_page_id=page.id)
 
     # 2. Ingest into RAG (update knowledge base with current version)
-    rag.ingest_page(page)
+    await rag.ingest_page(page)
 
     # 3. Analyst Agent
     critiques = await analyst.analyze_content(page.body, context_docs)
