@@ -1,56 +1,59 @@
-# Arquitetura de Agentes - ConfluenceRefiner
+# Agent Architecture - ConfluenceRefiner
 
-Este documento define as personas e o fluxo de trabalho dos agentes de IA no sistema ConfluenceRefiner.
+This document defines the personas and workflow of the AI agents in the ConfluenceRefiner system.
 
-## Visão Geral
-O sistema utiliza um padrão de cadeia de responsabilidade onde cada agente possui uma função específica na refinação da documentação.
+## Overview
+The system uses a Chain of Responsibility pattern where each agent has a specific role in refining documentation.
 
 ## Personas
 
-### 1. Analyst Agent (O Analista)
-**Responsabilidade:** Ler o texto cru extraído do Confluence e identificar problemas.
-**Input:** Texto da página (raw), Metadados.
-**Output:** Lista estruturada de críticas (issues).
-**Critérios de Análise:**
-- Clareza e concisão.
-- Atualização (datas, versões de software mencionadas).
-- Formatação (headers, code blocks).
-- Tom de voz (deve ser técnico e formal).
+### 1. Analyst Agent
+**Responsibility:** Read the raw text extracted from Confluence and identify issues.
+**Input:** Page text (raw), Metadata.
+**Output:** Structured list of critiques (issues).
+**Analysis Criteria:**
+- Clarity and conciseness.
+- Freshness (dates, software versions mentioned).
+- Formatting (headers, code blocks).
+- Tone (should be technical and formal).
 
-### 2. Writer Agent (O Escritor)
-**Responsabilidade:** Reescrever o conteúdo com base nas críticas do Analista e no Guia de Estilo.
-**Input:** Texto original, Lista de críticas.
-**Output:** Texto refinado (Markdown).
-**Diretrizes:**
-- Corrigir todas as críticas apontadas.
-- Manter a estrutura lógica original, a menos que seja confusa.
-- Garantir que exemplos de código estejam formatados corretamente.
+### 2. Writer Agent
+**Responsibility:** Rewrite the content based on Analyst critiques and the Style Guide.
+**Input:** Original text, List of critiques.
+**Output:** Refined text (Markdown).
+**Guidelines:**
+- Fix all critiques pointed out.
+- Maintain the original logical structure unless it is confusing.
+- Ensure code examples are formatted correctly.
 
-### 3. Reviewer Agent (O Revisor)
-**Responsabilidade:** Validar o texto refinado antes da publicação.
-**Input:** Texto refinado, Texto original.
-**Output:** Status (APROVADO / REJEITADO) e Comentários finais.
-**Critérios:**
-- O significado original foi preservado?
-- O texto está alucinado (inventou informações)?
-- As críticas do Analista foram resolvidas?
+### 3. Reviewer Agent
+**Responsibility:** Validate the refined text before publication.
+**Input:** Refined text, Original text.
+**Output:** Status (APPROVED / REJECTED) and Final Comments.
+**Criteria:**
+- Was the original meaning preserved?
+- Is the text hallucinated (invented information)?
+- Were the Analyst's critiques resolved?
 
-## Fluxo de Execução
+## Execution Flow
 
-1. **Ingestão:** `ConfluenceService` extrai a página.
-2. **Retrieval:** `RAGService` busca contexto relevante (páginas relacionadas) para evitar contradições.
-3. **Análise:** `Analyst Agent` processa o conteúdo + contexto.
-4. **Escrita:** `Writer Agent` gera a nova versão.
-5. **Revisão:** `Reviewer Agent` aprova ou solicita ajustes (loop opcional, por enquanto linear).
-6. **Saída:** Resultado final é retornado via API.
+1. **Ingestion:** `ConfluenceService` extracts the page.
+2. **Retrieval:** `RAGService` fetches relevant context (related pages) to avoid contradictions.
+3. **Analysis:** `Analyst Agent` processes content + context.
+4. **Writing:** `Writer Agent` generates the new version.
+5. **Review:** `Reviewer Agent` approves or requests adjustments (optional loop, currently linear).
+6. **Output:** Final result is returned via API.
 
 ## Future Roadmap
 
 ### 1. Robust Semantic Search
 Implement advanced embedding models and hybrid search (keyword + semantic) in `RAGService` to improve context retrieval accuracy.
+- **Action:** Integrate BM25 alongside ChromaDB vector search.
 
 ### 2. Interactive Review Loop
 Allow the `Reviewer Agent` to send feedback back to the `Writer Agent` automatically if the quality threshold isn't met, creating a self-correcting loop (max retries).
+- **Action:** Modify `orchestrator.py` to implement a `while` loop with a max retry counter.
 
 ### 3. Analytics Dashboard
-Create a frontend or API endpoint to visualize common critique patterns (e.g., "Most pages lack code examples"), helping the team identify systemic documentation issues.
+Create a frontend (React/Vue) to visualize jobs, compare original vs. refined content (diff view), and manually approve changes before publishing.
+- **Action:** Initialize a `frontend/` directory and build a basic job status view.

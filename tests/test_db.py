@@ -1,7 +1,7 @@
 import pytest
 import os
 import asyncio
-from confluence_refiner.db import init_db, save_job, get_job
+from confluence_refiner.database import init_db, save_job, get_job
 from confluence_refiner.models import RefinementResult, RefinementStatus
 
 # Use a separate DB for testing
@@ -11,7 +11,7 @@ TEST_DB_PATH = "test_jobs.db"
 @pytest.fixture
 def test_db():
     # Patch DB_PATH in the db module
-    import confluence_refiner.db as db_module
+    import confluence_refiner.database as db_module
     old_path = db_module.DB_PATH
     db_module.DB_PATH = TEST_DB_PATH
 

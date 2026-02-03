@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from .models import RefinementResult, RefinementStatus
 from .services import confluence, rag
@@ -34,8 +35,13 @@ async def process_refinement(page_id: str):
 async def process_space_ingestion(space_key: str):
     try:
         pages = await confluence.get_pages_from_space(space_key)
-        for page in pages:
-            await rag.ingest_page(page)
+        sem = asyncio.Semaphore(5)
+
+        async def ingest_with_sem(page):
+            async with sem:
+                await rag.ingest_page(page)
+
+        await asyncio.gather(*(ingest_with_sem(page) for page in pages))
     except Exception as e:
         print(f"Error ingesting space {space_key}: {e}")
 
