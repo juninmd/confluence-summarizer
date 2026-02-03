@@ -8,7 +8,7 @@ from confluence_refiner.models import RefinementResult, RefinementStatus, Conflu
 @pytest.fixture
 def client():
     # Patch init_db to avoid real DB creation during startup
-    with patch("confluence_refiner.db.init_db", new_callable=AsyncMock):
+    with patch("confluence_refiner.database.init_db", new_callable=AsyncMock):
         with TestClient(app) as c:
             yield c
 
@@ -28,14 +28,13 @@ def mock_refine_page():
 @pytest.fixture
 def mock_db():
     # We patch the functions in the database module that main imports
-    # Since main calls them with await, they must be awaitable.
     with patch("confluence_refiner.database.save_job", new_callable=AsyncMock) as mock_save, \
          patch("confluence_refiner.database.get_job", new_callable=AsyncMock) as mock_get, \
          patch("confluence_refiner.database.init_db", new_callable=AsyncMock) as mock_init:
         yield mock_save, mock_get, mock_init
 
 
-def test_start_refinement(mock_confluence_get_page, mock_refine_page, mock_db):
+def test_start_refinement(client, mock_confluence_get_page, mock_refine_page, mock_db):
     mock_save, mock_get, _ = mock_db
 
     # Setup mocks
@@ -54,13 +53,12 @@ def test_start_refinement(mock_confluence_get_page, mock_refine_page, mock_db):
     data = response.json()
     assert data["page_id"] == "123"
     assert data["message"] == "Refinement job started"
-    assert mock_save.called
 
     # Verify DB save was called (initially with PROCESSING)
-    assert mock_db_save_job.called
+    assert mock_save.called
 
 
-def test_get_status_not_found(mock_db):
+def test_get_status_not_found(client, mock_db):
     mock_save, mock_get, _ = mock_db
     mock_get.return_value = None
 
@@ -68,7 +66,7 @@ def test_get_status_not_found(mock_db):
     assert response.status_code == 404
 
 
-def test_get_status_found(mock_db):
+def test_get_status_found(client, mock_db):
     mock_save, mock_get, _ = mock_db
     mock_get.return_value = RefinementResult(
         page_id="456", original_content="Org", status=RefinementStatus.PROCESSING
@@ -85,7 +83,7 @@ def mock_confluence_update_page():
         yield mock
 
 
-def test_publish_page_success(mock_confluence_get_page, mock_confluence_update_page, mock_db):
+def test_publish_page_success(client, mock_confluence_get_page, mock_confluence_update_page, mock_db):
     mock_save, mock_get, _ = mock_db
 
     mock_get.return_value = RefinementResult(
@@ -109,14 +107,14 @@ def test_publish_page_success(mock_confluence_get_page, mock_confluence_update_p
     mock_confluence_update_page.assert_called_once()
 
 
-def test_publish_page_not_found(mock_db):
+def test_publish_page_not_found(client, mock_db):
     mock_save, mock_get, _ = mock_db
     mock_get.return_value = None
     response = client.post("/publish/999")
     assert response.status_code == 404
 
 
-def test_publish_page_not_completed(mock_db):
+def test_publish_page_not_completed(client, mock_db):
     mock_save, mock_get, _ = mock_db
     mock_get.return_value = RefinementResult(
         page_id="888", original_content="Org", status=RefinementStatus.PROCESSING
@@ -125,8 +123,9 @@ def test_publish_page_not_completed(mock_db):
     assert response.status_code == 400
 
 
-def test_publish_page_no_content(client, mock_db_get_job):
-    mock_db_get_job.return_value = RefinementResult(
+def test_publish_page_no_content(client, mock_db):
+    mock_save, mock_get, _ = mock_db
+    mock_get.return_value = RefinementResult(
         page_id="789",
         original_content="Org",
         status=RefinementStatus.COMPLETED,
@@ -137,8 +136,9 @@ def test_publish_page_no_content(client, mock_db_get_job):
     assert "No rewritten content available" in response.json()["detail"]
 
 
-def test_publish_page_update_failure(client, mock_confluence_get_page, mock_confluence_update_page, mock_db_get_job):
-    mock_db_get_job.return_value = RefinementResult(
+def test_publish_page_update_failure(client, mock_confluence_get_page, mock_confluence_update_page, mock_db):
+    mock_save, mock_get, _ = mock_db
+    mock_get.return_value = RefinementResult(
         page_id="789",
         original_content="Org",
         status=RefinementStatus.COMPLETED,
@@ -158,6 +158,4 @@ def test_ingest_space(client):
     with patch("confluence_refiner.main.process_space_ingestion", new_callable=AsyncMock):
         response = client.post("/ingest/space/TEST")
         assert response.status_code == 200
-        # Background task logic is handled by FastAPI, difficult to assert execution without real loop
-        # But we can assert response
         assert "Ingestion started" in response.json()["message"]

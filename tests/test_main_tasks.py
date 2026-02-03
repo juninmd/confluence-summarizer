@@ -18,7 +18,7 @@ def mock_rag():
 
 @pytest.fixture
 def mock_db():
-    with patch("confluence_refiner.main.db", new_callable=AsyncMock) as mock:
+    with patch("confluence_refiner.main.database", new_callable=AsyncMock) as mock:
         yield mock
 
 
@@ -58,12 +58,13 @@ async def test_process_refinement_failure(mock_confluence, mock_db):
 @pytest.mark.asyncio
 async def test_process_space_ingestion_success(mock_confluence, mock_rag):
     mock_confluence.get_pages_from_space.return_value = [
-        ConfluencePage(id="1", title="T", body="B", space_key="S", version=1, url="u")
+        ConfluencePage(id="1", title="T1", body="B1", space_key="S", version=1, url="u1"),
+        ConfluencePage(id="2", title="T2", body="B2", space_key="S", version=1, url="u2"),
     ]
 
     await process_space_ingestion("S")
 
-    mock_rag.ingest_page.assert_called_once()
+    assert mock_rag.ingest_page.call_count == 2
 
 
 @pytest.mark.asyncio

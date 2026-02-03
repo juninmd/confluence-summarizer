@@ -18,6 +18,8 @@ This file serves as the "Living Memory" for the Jules agent working on the Confl
 ## Learnings
 - **Persistence:** Moved from in-memory dict to SQLite for job storage to prevent data loss.
 - **Async Safety:** RAG operations (ChromaDB) are synchronous and must be wrapped in `asyncio.to_thread` to avoid blocking the FastAPI event loop.
+- **Code Hygiene:** Consolidated duplicate database modules (`db.py` and `database.py`) into `database.py` to avoid confusion and bugs.
+- **Performance:** Ingestion of large spaces should be parallelized (with semaphores) to reduce total time.
 
 ## Roadmap
 See `agents.md` for the functional roadmap. This file tracks meta-learnings and architectural decisions.
