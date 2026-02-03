@@ -4,7 +4,13 @@ from unittest.mock import AsyncMock, patch
 from confluence_refiner.main import app
 from confluence_refiner.models import RefinementResult, RefinementStatus, ConfluencePage
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    # Patch init_db to avoid real DB creation during startup
+    with patch("confluence_refiner.db.init_db", new_callable=AsyncMock):
+        with TestClient(app) as c:
+            yield c
 
 
 @pytest.fixture
@@ -49,6 +55,9 @@ def test_start_refinement(mock_confluence_get_page, mock_refine_page, mock_db):
     assert data["page_id"] == "123"
     assert data["message"] == "Refinement job started"
     assert mock_save.called
+
+    # Verify DB save was called (initially with PROCESSING)
+    assert mock_db_save_job.called
 
 
 def test_get_status_not_found(mock_db):
@@ -114,3 +123,41 @@ def test_publish_page_not_completed(mock_db):
     )
     response = client.post("/publish/888")
     assert response.status_code == 400
+
+
+def test_publish_page_no_content(client, mock_db_get_job):
+    mock_db_get_job.return_value = RefinementResult(
+        page_id="789",
+        original_content="Org",
+        status=RefinementStatus.COMPLETED,
+        rewritten_content=""  # Empty
+    )
+    response = client.post("/publish/789")
+    assert response.status_code == 400
+    assert "No rewritten content available" in response.json()["detail"]
+
+
+def test_publish_page_update_failure(client, mock_confluence_get_page, mock_confluence_update_page, mock_db_get_job):
+    mock_db_get_job.return_value = RefinementResult(
+        page_id="789",
+        original_content="Org",
+        status=RefinementStatus.COMPLETED,
+        rewritten_content="New Content"
+    )
+    mock_confluence_get_page.return_value = ConfluencePage(
+        id="789", title="Page", body="Org", space_key="S", version=1, url="url"
+    )
+    mock_confluence_update_page.side_effect = Exception("Confluence Down")
+
+    response = client.post("/publish/789")
+    assert response.status_code == 500
+    assert "Failed to publish" in response.json()["detail"]
+
+
+def test_ingest_space(client):
+    with patch("confluence_refiner.main.process_space_ingestion", new_callable=AsyncMock):
+        response = client.post("/ingest/space/TEST")
+        assert response.status_code == 200
+        # Background task logic is handled by FastAPI, difficult to assert execution without real loop
+        # But we can assert response
+        assert "Ingestion started" in response.json()["message"]

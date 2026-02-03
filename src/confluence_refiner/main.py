@@ -35,7 +35,7 @@ async def process_space_ingestion(space_key: str):
     try:
         pages = await confluence.get_pages_from_space(space_key)
         for page in pages:
-            rag.ingest_page(page)
+            await rag.ingest_page(page)
     except Exception as e:
         print(f"Error ingesting space {space_key}: {e}")
 

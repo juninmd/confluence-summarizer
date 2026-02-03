@@ -43,3 +43,14 @@ O sistema utiliza um padrão de cadeia de responsabilidade onde cada agente poss
 4. **Escrita:** `Writer Agent` gera a nova versão.
 5. **Revisão:** `Reviewer Agent` aprova ou solicita ajustes (loop opcional, por enquanto linear).
 6. **Saída:** Resultado final é retornado via API.
+
+## Future Roadmap
+
+### 1. Robust Semantic Search
+Implement advanced embedding models and hybrid search (keyword + semantic) in `RAGService` to improve context retrieval accuracy.
+
+### 2. Interactive Review Loop
+Allow the `Reviewer Agent` to send feedback back to the `Writer Agent` automatically if the quality threshold isn't met, creating a self-correcting loop (max retries).
+
+### 3. Analytics Dashboard
+Create a frontend or API endpoint to visualize common critique patterns (e.g., "Most pages lack code examples"), helping the team identify systemic documentation issues.

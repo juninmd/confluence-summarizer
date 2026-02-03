@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import List, Optional, Any, cast, Dict
 import chromadb
 from chromadb.api.types import OneOrMany, Metadata, Where
@@ -54,7 +55,7 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[st
     return chunks
 
 
-def ingest_page(page: ConfluencePage) -> None:
+def _ingest_page(page: ConfluencePage) -> None:
     """
     Ingests a page into the vector database.
 
@@ -99,7 +100,14 @@ def ingest_page(page: ConfluencePage) -> None:
         )
 
 
-def query_context(text: str, n_results: int = 3, exclude_page_id: Optional[str] = None) -> List[str]:
+async def ingest_page(page: ConfluencePage) -> None:
+    """
+    Asynchronously ingests a page into the vector database.
+    """
+    await asyncio.to_thread(_ingest_page, page)
+
+
+def _query_context(text: str, n_results: int = 3, exclude_page_id: Optional[str] = None) -> List[str]:
     """
     Retrieves relevant context for the given text.
 
@@ -131,3 +139,10 @@ def query_context(text: str, n_results: int = 3, exclude_page_id: Optional[str] 
             return docs[0]  # type: ignore
 
     return []
+
+
+async def query_context(text: str, n_results: int = 3, exclude_page_id: Optional[str] = None) -> List[str]:
+    """
+    Asynchronously retrieves relevant context for the given text.
+    """
+    return await asyncio.to_thread(_query_context, text, n_results, exclude_page_id)
