@@ -3,12 +3,12 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from .models import RefinementResult, RefinementStatus
 from .services import confluence, rag
 from .agents import refine_page
-from . import db
+from . import database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await db.init_db()
+    await database.init_db()
     yield
 
 
@@ -19,7 +19,7 @@ async def process_refinement(page_id: str):
     try:
         page = await confluence.get_page(page_id)
         result = await refine_page(page)
-        await db.save_job(result)
+        await database.save_job(result)
     except Exception as e:
         # Update job with error
         result = RefinementResult(
@@ -28,7 +28,7 @@ async def process_refinement(page_id: str):
             status=RefinementStatus.FAILED,
             reviewer_comments=str(e)
         )
-        await db.save_job(result)
+        await database.save_job(result)
 
 
 async def process_space_ingestion(space_key: str):
@@ -50,7 +50,7 @@ async def start_refinement(page_id: str, background_tasks: BackgroundTasks):
         original_content="",
         status=RefinementStatus.PROCESSING
     )
-    await db.save_job(job)
+    await database.save_job(job)
     background_tasks.add_task(process_refinement, page_id)
     return {"message": "Refinement job started", "page_id": page_id}
 
@@ -60,10 +60,10 @@ async def get_status(page_id: str):
     """
     Checks the status of a refinement job.
     """
-    job = await db.get_job(page_id)
-    if not job:
+    result = await database.get_job(page_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
+    return result
 
 
 @app.post("/ingest/space/{space_key}")
@@ -80,7 +80,8 @@ async def publish_page(page_id: str):
     """
     Publishes the refined content to Confluence.
     """
-    result = await db.get_job(page_id)
+    result = await database.get_job(page_id)
+
     if not result:
         raise HTTPException(status_code=404, detail="Job not found")
 

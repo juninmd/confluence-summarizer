@@ -1,44 +1,74 @@
 # ConfluenceRefiner
 
-ConfluenceRefiner is an AI-powered system designed to ingest, analyze, and refine Confluence documentation. It leverages a Chain of Responsibility pattern with specialized agents (Analyst, Writer, Reviewer) and a RAG (Retrieval-Augmented Generation) system to ensure documentation is clear, accurate, and consistent.
+A robust system to refine Confluence documentation using AI agents. This system connects to Confluence, ingests pages, indexes them for RAG (Retrieval-Augmented Generation), and uses a multi-agent system to analyze, rewrite, and review content.
 
-## Features
+## Architecture
 
--   **Agentic Workflow**:
-    -   **Analyst**: Critiques content for clarity, accuracy, and tone.
-    -   **Writer**: Rewrites content based on critiques.
-    -   **Reviewer**: Validates the output.
--   **RAG Integration**: Uses ChromaDB to provide context-aware analysis and prevent hallucinations.
--   **Async Architecture**: Built with FastAPI and asyncio for high performance.
--   **Persistence**: SQLite-backed job storage.
+The system follows a Chain of Responsibility pattern with three main agents:
+1.  **Analyst Agent**: Critiques the content for clarity, accuracy, and formatting.
+2.  **Writer Agent**: Rewrites the content based on critiques.
+3.  **Reviewer Agent**: Validates the rewritten content.
+
+**Tech Stack:**
+-   **Language**: Python 3.11+
+-   **Framework**: FastAPI
+-   **Package Manager**: `uv`
+-   **Type Checking**: `pyright` (strict)
+-   **Linting**: `flake8`
+-   **Vector DB**: ChromaDB (local)
+-   **Persistence**: SQLite (for job status)
 
 ## Setup
 
-1.  **Prerequisites**: Python 3.11+, `uv` (Universal Python Packaging).
-2.  **Install Dependencies**:
+1.  **Install `uv`**:
     ```bash
-    uv sync --all-extras --dev
+    curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
+
+2.  **Install dependencies**:
+    ```bash
+    uv sync
+    ```
+
 3.  **Environment Variables**:
-    Create a `.env` file (or set variables):
-    -   `CONFLUENCE_URL`
-    -   `CONFLUENCE_USERNAME`
-    -   `CONFLUENCE_API_TOKEN`
-    -   `CHROMA_DB_PATH` (optional, defaults to `./chroma_db`)
+    Create a `.env` file with the following:
+    ```env
+    CONFLUENCE_URL=https://your-domain.atlassian.net/wiki
+    CONFLUENCE_USERNAME=your-email@example.com
+    CONFLUENCE_API_TOKEN=your-api-token
+    OPENAI_API_KEY=your-openai-api-key
+    CHROMA_DB_PATH=./chroma_db
+    DB_PATH=jobs.db
+    ```
 
 ## Usage
 
 Start the server:
 ```bash
-uv run fastapi dev src/confluence_refiner/main.py
+uv run uvicorn confluence_refiner.main:app --reload
 ```
+(Note: ensure you are running from the `src` directory or adjust pythonpath, e.g. `uv run uvicorn confluence_refiner.main:app` if installed in editable mode, or `python -m confluence_refiner.main`)
 
-Endpoints:
+### Endpoints
+
 -   `POST /refine/{page_id}`: Start refining a page.
--   `GET /status/{page_id}`: Check job status.
--   `POST /publish/{page_id}`: Publish refined content to Confluence.
--   `POST /ingest/space/{space_key}`: Ingest a space into the RAG system.
+-   `GET /status/{page_id}`: Check the status of a refinement job.
+-   `POST /publish/{page_id}`: Publish the refined page back to Confluence.
+-   `POST /ingest/space/{space_key}`: Ingest an entire space into the vector DB.
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Run tests:
+```bash
+uv run pytest
+```
+
+Run type checking:
+```bash
+uv run pyright src
+```
+
+Run linter:
+```bash
+uv run flake8 src
+```
