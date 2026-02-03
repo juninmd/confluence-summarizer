@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import asyncio
 from fastapi import FastAPI, BackgroundTasks, HTTPException
-from .models import RefinementResult, RefinementStatus
+from .models import RefinementResult, RefinementStatus, ConfluencePage
 from .services import confluence, rag
 from .agents import refine_page
 from . import database
@@ -37,7 +37,7 @@ async def process_space_ingestion(space_key: str):
         pages = await confluence.get_pages_from_space(space_key)
         sem = asyncio.Semaphore(5)
 
-        async def ingest_with_sem(page):
+        async def ingest_with_sem(page: ConfluencePage):
             async with sem:
                 await rag.ingest_page(page)
 
