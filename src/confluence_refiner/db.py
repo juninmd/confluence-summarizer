@@ -1,42 +1,49 @@
 import sqlite3
 import asyncio
 from typing import Optional
+from contextlib import contextmanager
 from .models import RefinementResult
 
 DB_PATH = "jobs.db"
 
 
-def _init_db():
+@contextmanager
+def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            page_id TEXT PRIMARY KEY,
-            data TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def _init_db():
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                page_id TEXT PRIMARY KEY,
+                data TEXT NOT NULL
+            )
+        """)
+        conn.commit()
 
 
 def _save_job(job: RefinementResult):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    data = job.model_dump_json()
-    cursor.execute("""
-        INSERT OR REPLACE INTO jobs (page_id, data)
-        VALUES (?, ?)
-    """, (job.page_id, data))
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        data = job.model_dump_json()
+        cursor.execute("""
+            INSERT OR REPLACE INTO jobs (page_id, data)
+            VALUES (?, ?)
+        """, (job.page_id, data))
+        conn.commit()
 
 
 def _get_job(page_id: str) -> Optional[RefinementResult]:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT data FROM jobs WHERE page_id = ?", (page_id,))
-    row = cursor.fetchone()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT data FROM jobs WHERE page_id = ?", (page_id,))
+        row = cursor.fetchone()
 
     if row:
         return RefinementResult.model_validate_json(row[0])
