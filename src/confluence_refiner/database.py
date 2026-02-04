@@ -10,6 +10,8 @@ DB_PATH = os.getenv("DB_PATH", "jobs.db")
 def _init_db_sync():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             page_id TEXT PRIMARY KEY,
