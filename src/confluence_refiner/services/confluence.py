@@ -12,14 +12,23 @@ CONFLUENCE_API_TOKEN = os.getenv("CONFLUENCE_API_TOKEN", "")
 _client: Optional[httpx.AsyncClient] = None
 
 
-def _get_auth():
+def _get_auth() -> Optional[tuple[str, str]]:
+    """
+    Retrieves the authentication tuple for Confluence.
+
+    Returns:
+        Optional[tuple[str, str]]: (username, api_token) or None if not configured.
+    """
     if not CONFLUENCE_USERNAME or not CONFLUENCE_API_TOKEN:
         return None
     return (CONFLUENCE_USERNAME, CONFLUENCE_API_TOKEN)
 
 
-def init_client():
-    """Initializes the global HTTP client."""
+def init_client() -> None:
+    """
+    Initializes the global HTTP client for connection pooling.
+    Should be called at application startup.
+    """
     global _client
     if _client is None:
         _client = httpx.AsyncClient(timeout=30.0)

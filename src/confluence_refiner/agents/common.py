@@ -2,8 +2,9 @@ import os
 from openai import AsyncOpenAI
 
 # Initialize OpenAI client
-# Assuming OPENAI_API_KEY is set in environment
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-mock-key-for-testing"))
+# Assuming OPENAI_API_KEY is set in environment.
+# We do not provide a default key to ensure it fails fast if not configured in production.
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 async def call_llm(

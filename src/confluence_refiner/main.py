@@ -15,10 +15,18 @@ async def lifespan(app: FastAPI):
     await confluence.close_client()
 
 
-app = FastAPI(title="Confluence Refiner", lifespan=lifespan)
+app = FastAPI(
+    title="Confluence Refiner",
+    description="A robust system to refine and standardize Confluence documentation using AI Agents.",
+    version="0.1.0",
+    lifespan=lifespan
+)
 
 
-async def process_refinement(page_id: str):
+async def process_refinement(page_id: str) -> None:
+    """
+    Background task to process the refinement of a single page.
+    """
     try:
         page = await confluence.get_page(page_id)
         result = await refine_page(page)
