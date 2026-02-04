@@ -10,7 +10,9 @@ from . import database
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.init_db()
+    confluence.init_client()
     yield
+    await confluence.close_client()
 
 
 app = FastAPI(title="Confluence Refiner", lifespan=lifespan)
@@ -35,7 +37,7 @@ async def process_refinement(page_id: str):
 async def process_space_ingestion(space_key: str):
     try:
         pages = await confluence.get_pages_from_space(space_key)
-        sem = asyncio.Semaphore(5)
+        sem = asyncio.Semaphore(10)
 
         async def ingest_with_sem(page: ConfluencePage):
             async with sem:

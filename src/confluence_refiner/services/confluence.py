@@ -1,5 +1,5 @@
 import os
-from typing import List, Any, cast
+from typing import List, Any, cast, Optional
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 from ..models import ConfluencePage
@@ -9,11 +9,36 @@ CONFLUENCE_URL = os.getenv("CONFLUENCE_URL", "https://example.atlassian.net/wiki
 CONFLUENCE_USERNAME = os.getenv("CONFLUENCE_USERNAME", "")
 CONFLUENCE_API_TOKEN = os.getenv("CONFLUENCE_API_TOKEN", "")
 
+_client: Optional[httpx.AsyncClient] = None
+
 
 def _get_auth():
     if not CONFLUENCE_USERNAME or not CONFLUENCE_API_TOKEN:
         return None
     return (CONFLUENCE_USERNAME, CONFLUENCE_API_TOKEN)
+
+
+def init_client():
+    """Initializes the global HTTP client."""
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(timeout=30.0)
+
+
+async def close_client():
+    """Closes the global HTTP client."""
+    global _client
+    if _client:
+        await _client.aclose()
+        _client = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    """Returns the shared HTTP client or creates a temporary one if not initialized."""
+    if _client:
+        return _client
+    # Fallback/Warning: This shouldn't ideally happen in prod if lifecycle is managed correctly
+    return httpx.AsyncClient(timeout=30.0)
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -33,13 +58,19 @@ async def get_page(page_id: str) -> ConfluencePage:
     url = f"{CONFLUENCE_URL}/rest/api/content/{page_id}"
     params = {"expand": "body.storage,version,space"}
 
-    async with httpx.AsyncClient() as client:
+    client = _get_client()
+    # If the client is the shared one, we don't close it here.
+    # If it's a temporary one (fallback), we should technically close it, but
+    # to keep it simple and performant, we assume init_client() is called.
+    # For safety in fallback:
+    should_close = client is not _client
+
+    try:
         response = await client.get(
             url,
             auth=_get_auth(),
             headers={"Accept": "application/json"},
-            params=params,
-            timeout=10.0
+            params=params
         )
         response.raise_for_status()
         data = response.json()
@@ -55,6 +86,9 @@ async def get_page(page_id: str) -> ConfluencePage:
             version=data["version"]["number"],
             url=f"{CONFLUENCE_URL}{webui}"
         )
+    finally:
+        if should_close:
+            await client.aclose()
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -74,13 +108,16 @@ async def get_pages_from_space(space_key: str, limit: int = 50) -> List[Confluen
         "spaceKey": space_key,
         "type": "page",
         "expand": "body.storage,version,space",
-        "limit": min(limit, 25)  # Fetch in chunks
+        "limit": min(limit, 50)  # Fetch in chunks of up to 50
     }
 
     pages: List[ConfluencePage] = []
     start = 0
 
-    async with httpx.AsyncClient() as client:
+    client = _get_client()
+    should_close = client is not _client
+
+    try:
         while len(pages) < limit:
             current_params = base_params.copy()
             current_params["start"] = start
@@ -89,8 +126,7 @@ async def get_pages_from_space(space_key: str, limit: int = 50) -> List[Confluen
                 url,
                 auth=_get_auth(),
                 headers={"Accept": "application/json"},
-                params=current_params,
-                timeout=20.0
+                params=current_params
             )
             response.raise_for_status()
             data = response.json()
@@ -118,6 +154,9 @@ async def get_pages_from_space(space_key: str, limit: int = 50) -> List[Confluen
                 break
 
             start += len(results)
+    finally:
+        if should_close:
+            await client.aclose()
 
     return pages
 
@@ -153,13 +192,15 @@ async def update_page(page_id: str, title: str, body: str, version_number: int) 
         }
     }
 
-    async with httpx.AsyncClient() as client:
+    client = _get_client()
+    should_close = client is not _client
+
+    try:
         response = await client.put(
             url,
             auth=cast(Any, _get_auth()),
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            json=payload,
-            timeout=10.0
+            json=payload
         )
         response.raise_for_status()
         data = response.json()
@@ -175,3 +216,6 @@ async def update_page(page_id: str, title: str, body: str, version_number: int) 
             version=data["version"]["number"],
             url=f"{CONFLUENCE_URL}{webui}"
         )
+    finally:
+        if should_close:
+            await client.aclose()

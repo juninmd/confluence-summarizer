@@ -40,6 +40,9 @@ async def test_get_pages_from_space_pagination():
         mock_client_instance = MockClient.return_value
         mock_client_instance.__aenter__.return_value = mock_client_instance
 
+        # Ensure aclose is an AsyncMock
+        mock_client_instance.aclose = AsyncMock()
+
         # Make get an AsyncMock so it can be awaited
         mock_client_instance.get = AsyncMock(side_effect=[mock_response_1, mock_response_2])
 
