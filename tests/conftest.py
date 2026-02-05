@@ -9,6 +9,7 @@ os.environ["CONFLUENCE_API_TOKEN"] = "testtoken"
 os.environ["CHROMA_DB_PATH"] = "./test_chroma_db"
 os.environ["DB_PATH"] = ":memory:"
 
+
 @pytest.fixture(scope="session", autouse=True)
 def set_env_fixture():
     # Double check/ensure they are set if overwritten

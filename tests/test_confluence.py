@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from confluence_refiner.services import confluence
-from confluence_refiner.models import ConfluencePage
 
 
 @pytest.fixture
@@ -14,6 +13,7 @@ def mock_httpx_client():
         mock_instance.put = AsyncMock()
         yield mock_instance
 
+
 @pytest.fixture
 def reset_confluence_client():
     # Reset singleton before and after test
@@ -25,12 +25,13 @@ def reset_confluence_client():
         # as we mock the client anyway.
         confluence._client = None
 
+
 @pytest.mark.asyncio
 async def test_init_and_close_client(reset_confluence_client):
     confluence.init_client()
     assert confluence._client is not None
 
-    with patch("httpx.AsyncClient.aclose", new_callable=AsyncMock) as mock_aclose:
+    with patch("httpx.AsyncClient.aclose", new_callable=AsyncMock):
         # We need to manually inject the mock into the real instance created by init_client
         # or mock AsyncClient before init_client.
         # Easier: mock AsyncClient before init_client.
@@ -142,6 +143,7 @@ async def test_get_pages_from_space_pagination(mock_httpx_client, reset_confluen
     assert pages[1].id == "2"
     assert mock_httpx_client.get.call_count == 2
 
+
 @pytest.mark.asyncio
 async def test_get_auth_missing_env(mock_httpx_client):
     # Patch the module-level variables
@@ -162,6 +164,7 @@ async def test_get_auth_missing_env(mock_httpx_client):
         args, kwargs = mock_httpx_client.get.call_args
         assert kwargs["auth"] is None
 
+
 @pytest.mark.asyncio
 async def test_get_pages_no_results(mock_httpx_client):
     mock_resp = MagicMock()
@@ -171,6 +174,7 @@ async def test_get_pages_no_results(mock_httpx_client):
     pages = await confluence.get_pages_from_space("S")
     assert len(pages) == 0
 
+
 @pytest.mark.asyncio
 async def test_get_pages_no_next_link(mock_httpx_client):
     mock_resp = MagicMock()
@@ -179,9 +183,33 @@ async def test_get_pages_no_next_link(mock_httpx_client):
             "id": "1", "title": "T", "body": {"storage": {"value": "B"}},
             "version": {"number": 1}, "_links": {"webui": "/"}
         }],
-        "_links": {"self": "..."} # _links present but no next
+        "_links": {"self": "..."}  # _links present but no next
     }
     mock_httpx_client.get.return_value = mock_resp
 
     pages = await confluence.get_pages_from_space("S")
     assert len(pages) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_pages_limit_reached(mock_httpx_client):
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "results": [
+            {
+                "id": "1", "title": "T1", "body": {"storage": {"value": "B"}},
+                "version": {"number": 1}, "_links": {"webui": "/"}
+            },
+            {
+                "id": "2", "title": "T2", "body": {"storage": {"value": "B"}},
+                "version": {"number": 1}, "_links": {"webui": "/"}
+            }
+        ],
+        "_links": {"next": "/next"}
+    }
+    mock_httpx_client.get.return_value = mock_resp
+
+    pages = await confluence.get_pages_from_space("S", limit=1)
+
+    assert len(pages) == 1
+    assert pages[0].id == "1"
