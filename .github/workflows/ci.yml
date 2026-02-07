@@ -1,3 +1,5 @@
+# GitHub Actions Workflow for ConfluenceRefiner
+# Runs tests, linting, and type checking on every push and PR.
 name: CI
 
 on:

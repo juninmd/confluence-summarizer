@@ -1,10 +1,13 @@
-from contextlib import asynccontextmanager
-import asyncio
-from fastapi import FastAPI, BackgroundTasks, HTTPException
-from .models import RefinementResult, RefinementStatus, ConfluencePage
-from .services import confluence, rag
-from .agents import refine_page
-from . import database
+from dotenv import load_dotenv
+load_dotenv()
+
+from contextlib import asynccontextmanager  # noqa: E402
+import asyncio  # noqa: E402
+from fastapi import FastAPI, BackgroundTasks, HTTPException  # noqa: E402
+from .models import RefinementResult, RefinementStatus, ConfluencePage  # noqa: E402
+from .services import confluence, rag  # noqa: E402
+from .agents import refine_page  # noqa: E402
+from . import database  # noqa: E402
 
 
 @asynccontextmanager

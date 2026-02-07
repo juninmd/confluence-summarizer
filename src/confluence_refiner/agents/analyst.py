@@ -1,3 +1,9 @@
+"""
+Analyst Agent
+=============
+Analyzes the raw content for issues using an LLM.
+"""
+
 import json
 from typing import List
 from ..models import Critique

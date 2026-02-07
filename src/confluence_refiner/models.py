@@ -1,3 +1,9 @@
+"""
+Data Models
+===========
+Pydantic models and Enums used throughout the application.
+"""
+
 from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel
