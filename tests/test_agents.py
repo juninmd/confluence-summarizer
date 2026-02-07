@@ -88,6 +88,23 @@ async def test_writer_success():
 
 
 @pytest.mark.asyncio
+async def test_writer_with_context():
+    with patch("confluence_refiner.agents.writer.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = "Rewritten Content with Context"
+        critique = Critique(issue_type="A", description="B", severity="info", suggestion="C")
+        context = ["Relevant Info 1", "Relevant Info 2"]
+
+        result = await writer.rewrite_content("original", [critique], context)
+        assert result == "Rewritten Content with Context"
+
+        # Verify prompt contains context
+        args, _ = mock_llm.call_args
+        prompt = args[0]
+        assert "Relevant Info 1" in prompt
+        assert "Relevant Info 2" in prompt
+
+
+@pytest.mark.asyncio
 async def test_reviewer_approved():
     with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = '{"status": "completed", "comments": "LGTM"}'

@@ -1,5 +1,16 @@
+"""
+Confluence Service
+==================
+Handles all interactions with the Atlassian Confluence API.
+Features:
+- Authentication management
+- Asynchronous HTTP requests
+- Pagination handling
+- Rate limit handling with exponential backoff (tenacity)
+"""
+
 import os
-from typing import List, Any, cast, Optional
+from typing import List, Any, cast, Optional, Tuple
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 from ..models import ConfluencePage
@@ -12,7 +23,7 @@ CONFLUENCE_API_TOKEN = os.getenv("CONFLUENCE_API_TOKEN", "")
 _client: Optional[httpx.AsyncClient] = None
 
 
-def _get_auth() -> Optional[tuple[str, str]]:
+def _get_auth() -> Optional[Tuple[str, str]]:
     """
     Retrieves the authentication tuple for Confluence.
 

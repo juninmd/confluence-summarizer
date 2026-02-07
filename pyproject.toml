@@ -1,7 +1,7 @@
 [project]
 name = "confluence-refiner"
 version = "0.1.0"
-description = "A system to refine Confluence documentation using AI agents."
+description = "A robust system to refine and standardize Confluence documentation using AI agents, including RAG and strict typing."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [

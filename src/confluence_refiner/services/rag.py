@@ -1,3 +1,13 @@
+"""
+RAG Service
+===========
+Handles vector database interactions using ChromaDB.
+Features:
+- Document chunking with overlap
+- Vector ingestion (upsert)
+- Context retrieval (query)
+"""
+
 import os
 import asyncio
 from typing import List, Optional, Any, cast, Dict

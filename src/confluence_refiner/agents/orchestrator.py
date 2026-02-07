@@ -27,7 +27,8 @@ async def refine_page(page: ConfluencePage) -> RefinementResult:
         )
 
     # 4. Writer Agent
-    new_content = await writer.rewrite_content(page.body, critiques)
+    # Pass context_docs so the writer can ensure consistency
+    new_content = await writer.rewrite_content(page.body, critiques, context_docs)
 
     # 5. Reviewer Agent
     critiques_summary = "\n".join([c.description for c in critiques])

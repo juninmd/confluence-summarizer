@@ -19,10 +19,11 @@ The system uses a Chain of Responsibility pattern where each agent has a specifi
 
 ### 2. Writer Agent
 **Responsibility:** Rewrite the content based on Analyst critiques and the Style Guide.
-**Input:** Original text, List of critiques.
+**Input:** Original text, List of critiques, Related Context (RAG).
 **Output:** Refined text (Markdown).
 **Guidelines:**
 - Fix all critiques pointed out.
+- Use provided context to ensure factual consistency.
 - Maintain the original logical structure unless it is confusing.
 - Ensure code examples are formatted correctly.
 
@@ -40,7 +41,7 @@ The system uses a Chain of Responsibility pattern where each agent has a specifi
 1. **Ingestion:** `ConfluenceService` extracts the page.
 2. **Retrieval:** `RAGService` fetches relevant context (related pages) to avoid contradictions.
 3. **Analysis:** `Analyst Agent` processes content + context.
-4. **Writing:** `Writer Agent` generates the new version.
+4. **Writing:** `Writer Agent` generates the new version using critiques and context.
 5. **Review:** `Reviewer Agent` approves or requests adjustments (optional loop, currently linear).
 6. **Output:** Final result is returned via API.
 
