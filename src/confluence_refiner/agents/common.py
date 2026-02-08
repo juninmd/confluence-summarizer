@@ -1,10 +1,38 @@
 import os
+import logging
+from typing import Optional
 from openai import AsyncOpenAI
 
-# Initialize OpenAI client
-# Assuming OPENAI_API_KEY is set in environment.
-# We do not provide a default key to ensure it fails fast if not configured in production.
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+logger = logging.getLogger(__name__)
+
+_client: Optional[AsyncOpenAI] = None
+
+
+def _get_client() -> AsyncOpenAI:
+    global _client
+    if _client is None:
+        # We allow api_key to be None here (OpenAI lib might raise later, or we check it)
+        # But this prevents import-time crashes.
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not set. LLM calls will fail.")
+        _client = AsyncOpenAI(api_key=api_key)
+    return _client
+
+
+def clean_json_response(response: str) -> str:
+    """
+    Cleans the LLM response to ensure it is valid JSON.
+    Removes Markdown code blocks (```json ... ```).
+    """
+    cleaned = response.strip()
+    if cleaned.startswith("```"):
+        # Remove first line (```json or ```)
+        cleaned = cleaned.split("\n", 1)[1]
+        # Remove last line (```)
+        if cleaned.endswith("```"):
+            cleaned = cleaned.rsplit("\n", 1)[0]
+    return cleaned.strip()
 
 
 async def call_llm(
@@ -16,9 +44,7 @@ async def call_llm(
     """
     Calls the LLM with the given prompt.
     """
-
-    # Construct arguments explicitly to avoid Pyright errors with unpacking dicts
-    # into typed parameters.
+    client = _get_client()
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -38,8 +64,8 @@ async def call_llm(
                 messages=messages  # type: ignore
             )
 
-        return response.choices[0].message.content or ""
+        content = response.choices[0].message.content or ""
+        return content
     except Exception as e:
-        # In a real app we'd log this better
-        print(f"Error calling LLM: {e}")
+        logger.error(f"Error calling LLM: {e}", exc_info=True)
         return ""
