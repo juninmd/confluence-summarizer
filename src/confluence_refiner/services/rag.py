@@ -33,6 +33,11 @@ def _get_collection():
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
     """
     Splits text into chunks with overlap, respecting word boundaries.
+
+    Note:
+        This uses a naive character-based splitting strategy with word boundary checking.
+        For production, consider using a semantic chunker (e.g., using NLTK, Spacy,
+        or embedding-based segmentation) to better preserve context.
     """
     if not text:
         return []

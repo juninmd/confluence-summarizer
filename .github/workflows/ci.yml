@@ -1,15 +1,13 @@
-# GitHub Actions Workflow for ConfluenceRefiner
-# Runs tests, linting, and type checking on every push and PR.
 name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -27,31 +25,11 @@ jobs:
     - name: Install dependencies
       run: uv sync --all-extras --dev
 
-    - name: Run checks
-      run: |
-        uv run flake8 src tests
-        uv run pyright src
-        uv run pytest
+    - name: Lint with flake8
+      run: uv run flake8 src tests
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-    - name: Build package
-      run: uv build
+    - name: Type check with pyright
+      run: uv run pyright src
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v4
-        with:
-          semantic_version: 19
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Test with pytest
+      run: uv run pytest --cov=src --cov-report=term-missing

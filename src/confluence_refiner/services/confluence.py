@@ -10,6 +10,7 @@ Features:
 """
 
 import os
+import logging
 from typing import List, Any, cast, Optional, Tuple
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -19,6 +20,8 @@ from ..models import ConfluencePage
 CONFLUENCE_URL = os.getenv("CONFLUENCE_URL", "https://example.atlassian.net/wiki")
 CONFLUENCE_USERNAME = os.getenv("CONFLUENCE_USERNAME", "")
 CONFLUENCE_API_TOKEN = os.getenv("CONFLUENCE_API_TOKEN", "")
+
+logger = logging.getLogger(__name__)
 
 _client: Optional[httpx.AsyncClient] = None
 
@@ -31,6 +34,7 @@ def _get_auth() -> Optional[Tuple[str, str]]:
         Optional[tuple[str, str]]: (username, api_token) or None if not configured.
     """
     if not CONFLUENCE_USERNAME or not CONFLUENCE_API_TOKEN:
+        logger.warning("Confluence credentials not set. API calls may fail.")
         return None
     return (CONFLUENCE_USERNAME, CONFLUENCE_API_TOKEN)
 

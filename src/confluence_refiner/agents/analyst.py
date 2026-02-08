@@ -1,13 +1,30 @@
 """
 Analyst Agent
 =============
-Analyzes the raw content for issues using an LLM.
+The Analyst Agent is the first step in the refinement pipeline.
+It is responsible for reading the raw content extracted from Confluence and identifying issues.
+
+Responsibilities:
+- Analyze text for clarity, conciseness, and tone.
+- Check for formatting issues (headers, code blocks).
+- Identify outdated information (dates, versions).
+- output a structured list of critiques.
+
+Input:
+- Raw page content.
+- Related context (retrieved via RAG).
+
+Output:
+- A list of `Critique` objects.
 """
 
 import json
+import logging
 from typing import List
 from ..models import Critique
-from .common import call_llm
+from .common import call_llm, clean_json_response
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
 You are the Analyst Agent. Your goal is to critique technical documentation.
@@ -20,6 +37,13 @@ Each object must have: "issue_type", "description", "severity" (info, warning, c
 async def analyze_content(content: str, context: List[str]) -> List[Critique]:
     """
     Analyzes the content and returns a list of critiques.
+
+    Args:
+        content: The raw text content of the page.
+        context: A list of related document snippets to help with fact-checking.
+
+    Returns:
+        List[Critique]: A list of critiques found in the content.
     """
     context_str = "\n---\n".join(context)
     prompt = f"""
@@ -37,9 +61,10 @@ async def analyze_content(content: str, context: List[str]) -> List[Critique]:
         return []
 
     try:
-        data = json.loads(response)
+        cleaned_response = clean_json_response(response)
+        data = json.loads(cleaned_response)
         critiques_data = data.get("critiques", [])
         return [Critique(**c) for c in critiques_data]
     except Exception as e:
-        print(f"Error parsing analyst response: {e}")
+        logger.error(f"Error parsing analyst response: {e}\nResponse was: {response}", exc_info=True)
         return []

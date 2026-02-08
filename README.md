@@ -1,64 +1,47 @@
-# ConfluenceRefiner
+# Confluence Refiner
 
-A robust system to refine Confluence documentation using AI agents. This system connects to Confluence, ingests pages, indexes them for RAG (Retrieval-Augmented Generation), and uses a multi-agent system to analyze, rewrite, and review content.
+A robust system to refine and standardize Confluence documentation using AI Agents.
+
+## Overview
+
+This system connects to Confluence, ingests pages into a vector database (ChromaDB), and uses a multi-agent AI system (Analyst, Writer, Reviewer) to critique and rewrite documentation.
 
 ## Architecture
 
-The system follows a Chain of Responsibility pattern with three main agents:
-1.  **Analyst Agent**: Critiques the content for clarity, accuracy, and formatting.
-2.  **Writer Agent**: Rewrites the content based on critiques.
-3.  **Reviewer Agent**: Validates the rewritten content.
-
-**Tech Stack:**
--   **Language**: Python 3.11+
--   **Framework**: FastAPI
--   **Package Manager**: `uv`
--   **Type Checking**: `pyright` (strict)
--   **Linting**: `flake8`
--   **Vector DB**: ChromaDB (local)
--   **Persistence**: SQLite (for job status)
+- **Ingestion**: Async Confluence API client with pagination and rate limiting.
+- **RAG**: ChromaDB for context retrieval.
+- **Agents**:
+  - **Analyst**: Identifies issues in clarity, tone, and formatting.
+  - **Writer**: Rewrites content based on critiques and style guide.
+  - **Reviewer**: Validates the output.
+- **API**: FastAPI for job management (`/refine/{page_id}`, `/status/{page_id}`).
 
 ## Setup
 
-1.  **Install `uv`**:
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
+1. **Install Dependencies**:
+   ```bash
+   uv sync
+   ```
 
-2.  **Install dependencies**:
-    ```bash
-    uv sync
-    ```
+2. **Environment Variables**:
+   Create a `.env` file:
+   ```env
+   CONFLUENCE_URL=https://your-domain.atlassian.net/wiki
+   CONFLUENCE_USERNAME=your-email@example.com
+   CONFLUENCE_API_TOKEN=your-api-token
+   OPENAI_API_KEY=sk-...
+   CHROMA_DB_PATH=./chroma_db
+   DB_PATH=jobs.db
+   ```
 
-3.  **Environment Variables**:
-    Create a `.env` file with the following:
-    ```env
-    CONFLUENCE_URL=https://your-domain.atlassian.net/wiki
-    CONFLUENCE_USERNAME=your-email@example.com
-    CONFLUENCE_API_TOKEN=your-api-token
-    OPENAI_API_KEY=your-openai-api-key
-    CHROMA_DB_PATH=./chroma_db
-    DB_PATH=jobs.db
-    ```
+3. **Run the API**:
+   ```bash
+   uv run uvicorn src.confluence_refiner.main:app --reload
+   ```
 
-## Usage
+## Testing
 
-Start the server:
-```bash
-uv run uvicorn confluence_refiner.main:app --reload
-```
-(Note: ensure you are running from the `src` directory or adjust pythonpath, e.g. `uv run uvicorn confluence_refiner.main:app` if installed in editable mode, or `python -m confluence_refiner.main`)
-
-### Endpoints
-
--   `POST /refine/{page_id}`: Start refining a page.
--   `GET /status/{page_id}`: Check the status of a refinement job.
--   `POST /publish/{page_id}`: Publish the refined page back to Confluence.
--   `POST /ingest/space/{space_key}`: Ingest an entire space into the vector DB.
-
-## Development
-
-Run tests:
+Run the test suite:
 ```bash
 uv run pytest
 ```
@@ -68,7 +51,6 @@ Run type checking:
 uv run pyright src
 ```
 
-Run linter:
-```bash
-uv run flake8 src
-```
+## Agents
+
+See `agents.md` for detailed agent personas and workflows.

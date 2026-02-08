@@ -6,8 +6,11 @@ from confluence_refiner.models import Critique, RefinementStatus
 
 @pytest.fixture
 def mock_openai():
-    with patch("confluence_refiner.agents.common.client") as mock:
-        yield mock
+    # Patch _get_client to return a mock client
+    with patch("confluence_refiner.agents.common._get_client") as mock_get_client:
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        yield mock_client
 
 
 @pytest.mark.asyncio
