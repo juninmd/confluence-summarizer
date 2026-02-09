@@ -36,26 +36,65 @@ app = FastAPI(
 )
 
 
-async def process_refinement(page_id: str) -> None:
+async def _perform_refinement(page: ConfluencePage) -> None:
     """
-    Background task to process the refinement of a single page.
+    Internal helper to perform refinement on a single page.
     """
-    logger.info(f"Starting refinement for page {page_id}")
+    logger.info(f"Starting refinement for page {page.id}")
     try:
-        page = await confluence.get_page(page_id)
         result = await refine_page(page)
         await database.save_job(result)
-        logger.info(f"Refinement completed for page {page_id} with status {result.status}")
+        logger.info(f"Refinement completed for page {page.id} with status {result.status}")
     except Exception as e:
-        logger.error(f"Refinement failed for page {page_id}: {e}", exc_info=True)
+        logger.error(f"Refinement failed for page {page.id}: {e}", exc_info=True)
         # Update job with error
         result = RefinementResult(
-            page_id=page_id,
-            original_content="",
+            page_id=page.id,
+            original_content=page.body,
             status=RefinementStatus.FAILED,
             reviewer_comments=str(e)
         )
         await database.save_job(result)
+
+
+async def process_refinement(page_id: str) -> None:
+    """
+    Background task to process the refinement of a single page.
+    """
+    logger.info(f"Starting refinement process for page {page_id}")
+    try:
+        page = await confluence.get_page(page_id)
+        await _perform_refinement(page)
+    except Exception as e:
+        logger.error(f"Failed to fetch page {page_id}: {e}", exc_info=True)
+        result = RefinementResult(
+            page_id=page_id,
+            original_content="",
+            status=RefinementStatus.FAILED,
+            reviewer_comments=f"Failed to fetch page: {str(e)}"
+        )
+        await database.save_job(result)
+
+
+async def process_space_refinement(space_key: str) -> None:
+    """
+    Background task to process refinement for all pages in a space.
+    """
+    logger.info(f"Starting space refinement for {space_key}")
+    try:
+        pages = await confluence.get_pages_from_space(space_key)
+        logger.info(f"Found {len(pages)} pages in space {space_key} for refinement")
+
+        sem = asyncio.Semaphore(5)
+
+        async def refine_with_sem(page: ConfluencePage):
+            async with sem:
+                await _perform_refinement(page)
+
+        await asyncio.gather(*(refine_with_sem(page) for page in pages))
+        logger.info(f"Space refinement completed for {space_key}")
+    except Exception as e:
+        logger.error(f"Error refining space {space_key}: {e}", exc_info=True)
 
 
 async def process_space_ingestion(space_key: str):
@@ -89,6 +128,16 @@ async def start_refinement(page_id: str, background_tasks: BackgroundTasks):
     await database.save_job(job)
     background_tasks.add_task(process_refinement, page_id)
     return {"message": "Refinement job started", "page_id": page_id}
+
+
+@app.post("/refine/space/{space_key}")
+async def start_space_refinement(space_key: str, background_tasks: BackgroundTasks):
+    """
+    Starts a refinement job for all pages in a space.
+    """
+    logger.info(f"Received refinement request for space {space_key}")
+    background_tasks.add_task(process_space_refinement, space_key)
+    return {"message": f"Refinement started for space {space_key}"}
 
 
 @app.get("/status/{page_id}", response_model=RefinementResult)

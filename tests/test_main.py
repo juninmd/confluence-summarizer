@@ -159,3 +159,11 @@ def test_ingest_space(client):
         response = client.post("/ingest/space/TEST")
         assert response.status_code == 200
         assert "Ingestion started" in response.json()["message"]
+
+
+def test_start_space_refinement(client):
+    with patch("confluence_refiner.main.process_space_refinement", new_callable=AsyncMock) as mock_task:
+        response = client.post("/refine/space/TEST_SPACE")
+        assert response.status_code == 200
+        assert "Refinement started for space TEST_SPACE" in response.json()["message"]
+        mock_task.assert_awaited_with("TEST_SPACE")
