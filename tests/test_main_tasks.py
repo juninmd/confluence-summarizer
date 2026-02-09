@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from confluence_refiner.main import process_refinement, process_space_ingestion
+from confluence_refiner.main import process_refinement, process_space_ingestion, process_space_refinement
 from confluence_refiner.models import RefinementStatus, ConfluencePage
 
 
@@ -74,3 +74,47 @@ async def test_process_space_ingestion_failure(mock_confluence):
 
     await process_space_ingestion("S")
     # Should complete without error
+
+
+@pytest.mark.asyncio
+async def test_process_space_refinement_success(mock_confluence, mock_refine_page, mock_db):
+    mock_confluence.get_pages_from_space.return_value = [
+        ConfluencePage(id="1", title="T1", body="B1", space_key="S", version=1, url="u1"),
+        ConfluencePage(id="2", title="T2", body="B2", space_key="S", version=1, url="u2"),
+    ]
+
+    result_mock = AsyncMock()
+    result_mock.status = RefinementStatus.COMPLETED
+    mock_refine_page.return_value = result_mock
+
+    await process_space_refinement("S")
+
+    assert mock_confluence.get_pages_from_space.call_count == 1
+    assert mock_refine_page.call_count == 2
+    assert mock_db.save_job.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_process_space_refinement_partial_failure(mock_confluence, mock_refine_page, mock_db):
+    """Test that one page failing refinement doesn't stop others."""
+    p1 = ConfluencePage(id="1", title="T1", body="B1", space_key="S", version=1, url="u1")
+    p2 = ConfluencePage(id="2", title="T2", body="B2", space_key="S", version=1, url="u2")
+    mock_confluence.get_pages_from_space.return_value = [p1, p2]
+
+    # First call succeeds, second fails
+    mock_refine_page.side_effect = [AsyncMock(), Exception("Refinement Failed")]
+
+    await process_space_refinement("S")
+
+    assert mock_refine_page.call_count == 2
+    # Both should trigger a save (one success, one failure report)
+    assert mock_db.save_job.call_count == 2
+
+    # Check the second save call was a failure
+    calls = mock_db.save_job.call_args_list
+    # Note: order is not guaranteed with asyncio.gather, but usually consistent for small list
+    # We just check that ONE of them was failed
+    statuses = [call[0][0].status for call in calls]
+    # Since mock_refine_page.return_value was AsyncMock, its status attribute might be mock default.
+    # But for the Exception case, we explicitly create a result with FAILED.
+    assert RefinementStatus.FAILED in statuses
