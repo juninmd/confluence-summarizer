@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """
 You are the Reviewer Agent. Validate if the rewritten content is acceptable.
 Check if critiques were addressed and if no new errors were introduced.
-Output a JSON object with "status" (must be one of: "completed", "rejected") and "comments" (string).
+Output a JSON object with "status" (must be one of: "approved", "rejected") and "comments" (string).
 """
 
 
@@ -68,7 +68,7 @@ async def review_content(original: str, rewritten: str, critiques_summary: str) 
         data = json.loads(cleaned_response)
         # Normalize status
         status_str = data.get("status", "").lower()
-        if status_str == "completed":
+        if status_str in ["completed", "approved", "accepted"]:
             status = RefinementStatus.COMPLETED
         else:
             status = RefinementStatus.REJECTED
