@@ -30,7 +30,7 @@ The system uses a Chain of Responsibility pattern where each agent has a specifi
 ### 3. Reviewer Agent
 **Responsibility:** Validate the refined text before publication.
 **Input:** Refined text, Original text.
-**Output:** Status (APPROVED / REJECTED) and Final Comments.
+**Output:** Status (APPROVED / REJECTED -> Mapped to COMPLETED/REJECTED internally) and Final Comments.
 **Criteria:**
 - Was the original meaning preserved?
 - Is the text hallucinated (invented information)?
