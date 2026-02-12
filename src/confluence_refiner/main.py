@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing application resources...")
     await database.init_db()
     confluence.init_client()
+    await rag.init_rag()
     yield
     logger.info("Cleaning up application resources...")
     await confluence.close_client()

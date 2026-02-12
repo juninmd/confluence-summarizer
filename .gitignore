@@ -9,3 +9,4 @@ jobs.db
 *.db
 .coverage
 htmlcov/
+test_chroma_db/

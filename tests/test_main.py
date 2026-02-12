@@ -7,8 +7,9 @@ from confluence_refiner.models import RefinementResult, RefinementStatus, Conflu
 
 @pytest.fixture
 def client():
-    # Patch init_db to avoid real DB creation during startup
-    with patch("confluence_refiner.database.init_db", new_callable=AsyncMock):
+    # Patch init_db and init_rag to avoid real DB creation during startup
+    with patch("confluence_refiner.database.init_db", new_callable=AsyncMock), \
+         patch("confluence_refiner.services.rag.init_rag", new_callable=AsyncMock):
         with TestClient(app) as c:
             yield c
 
