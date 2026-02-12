@@ -30,6 +30,11 @@ def _get_collection():
     return _collection
 
 
+async def init_rag():
+    """Initializes the RAG service (ChromaDB connection) asynchronously."""
+    await asyncio.to_thread(_get_collection)
+
+
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
     """
     Splits text into chunks with overlap, respecting word boundaries.
