@@ -46,6 +46,19 @@ def test_chunk_text_huge_word_force_break():
     assert len(chunks) > 0
 
 
+def test_chunk_text_empty_string():
+    text = ""
+    chunks = rag.chunk_text(text)
+    assert chunks == []
+
+
+@pytest.mark.asyncio
+async def test_init_rag():
+    with patch("confluence_refiner.services.rag._get_collection") as mock_get_collection:
+        await rag.init_rag()
+        mock_get_collection.assert_called_once()
+
+
 @pytest.mark.asyncio
 async def test_ingest_page(mock_chroma):
     page = ConfluencePage(

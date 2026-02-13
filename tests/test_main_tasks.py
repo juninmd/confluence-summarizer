@@ -118,3 +118,12 @@ async def test_process_space_refinement_partial_failure(mock_confluence, mock_re
     # Since mock_refine_page.return_value was AsyncMock, its status attribute might be mock default.
     # But for the Exception case, we explicitly create a result with FAILED.
     assert RefinementStatus.FAILED in statuses
+
+
+@pytest.mark.asyncio
+async def test_process_space_refinement_failure(mock_confluence):
+    # Test top-level failure (e.g. fetching pages failed)
+    mock_confluence.get_pages_from_space.side_effect = Exception("Total Fail")
+
+    # Should log error and complete without raising
+    await process_space_refinement("S")
