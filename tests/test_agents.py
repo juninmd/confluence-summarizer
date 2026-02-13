@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from confluence_refiner.agents import common, analyst, writer, reviewer
 from confluence_refiner.models import Critique, RefinementStatus
+import os
 
 
 @pytest.fixture
@@ -133,3 +134,41 @@ async def test_reviewer_parse_error():
 
         result = await reviewer.review_content("org", "new", "critiques")
         assert result["status"] == RefinementStatus.FAILED
+
+
+@pytest.mark.asyncio
+async def test_reviewer_empty_response():
+    with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = ""
+        result = await reviewer.review_content("org", "new", "critiques")
+        assert result["status"] == RefinementStatus.FAILED
+        assert result["comments"] == "No response from LLM"
+
+
+def test_clean_json_response_markdown():
+    response = "```json\n{\"key\": \"value\"}\n```"
+    cleaned = common.clean_json_response(response)
+    assert cleaned == '{"key": "value"}'
+
+    response = "```\n{\"key\": \"value\"}\n```"
+    cleaned = common.clean_json_response(response)
+    assert cleaned == '{"key": "value"}'
+
+
+def test_clean_json_response_simple():
+    response = '{"key": "value"}'
+    cleaned = common.clean_json_response(response)
+    assert cleaned == '{"key": "value"}'
+
+
+def test_get_client_missing_key():
+    # Reset client
+    common._client = None
+    with patch.dict(os.environ, {}, clear=True):
+        with patch("confluence_refiner.agents.common.logger") as mock_logger:
+            with patch("confluence_refiner.agents.common.AsyncOpenAI") as mock_openai_cls:
+                client = common._get_client()
+                mock_logger.warning.assert_called_with("OPENAI_API_KEY not set. LLM calls will fail.")
+                assert client is not None
+    # Cleanup
+    common._client = None
