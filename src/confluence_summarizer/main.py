@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Confluence Refiner",
+    title="Confluence Summarizer",
     description="A robust system to refine and standardize Confluence documentation using AI Agents.",
     version="0.1.0",
     lifespan=lifespan

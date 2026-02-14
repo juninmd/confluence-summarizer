@@ -1,6 +1,6 @@
-# Agent Architecture - ConfluenceRefiner
+# Agent Architecture - ConfluenceSummarizer
 
-This document defines the personas and workflow of the AI agents in the **ConfluenceRefiner** system.
+This document defines the personas and workflow of the AI agents in the **ConfluenceSummarizer** system.
 
 ## Overview
 The system uses a Chain of Responsibility pattern where each agent has a specific role in refining documentation.

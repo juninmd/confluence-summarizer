@@ -1,6 +1,6 @@
-# Contributing to ConfluenceRefiner
+# Contributing to ConfluenceSummarizer
 
-We love your input! We want to make contributing to ConfluenceRefiner as easy and transparent as possible, whether it's:
+We love your input! We want to make contributing to ConfluenceSummarizer as easy and transparent as possible, whether it's:
 
 - Reporting a bug
 - Discussing the current state of the code

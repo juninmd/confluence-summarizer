@@ -1,12 +1,12 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from confluence_refiner.agents import reviewer
-from confluence_refiner.models import RefinementStatus
+from confluence_summarizer.agents import reviewer
+from confluence_summarizer.models import RefinementStatus
 
 @pytest.fixture
 def mock_openai():
     # Patch _get_client to return a mock client
-    with patch("confluence_refiner.agents.common._get_client") as mock_get_client:
+    with patch("confluence_summarizer.agents.common._get_client") as mock_get_client:
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         yield mock_client
@@ -23,7 +23,7 @@ async def test_reviewer_status_parsing(mock_openai):
     ]
 
     for json_response, expected_status in test_cases:
-        with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
+        with patch("confluence_summarizer.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json_response
 
             result = await reviewer.review_content("orig", "new", "critique")
@@ -41,7 +41,7 @@ async def test_reviewer_rejection_parsing(mock_openai):
     ]
 
     for json_response, expected_status in test_cases:
-        with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
+        with patch("confluence_summarizer.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = json_response
 
             result = await reviewer.review_content("orig", "new", "critique")

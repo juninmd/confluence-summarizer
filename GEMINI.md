@@ -1,9 +1,9 @@
 # Jules Memory & Protocol
 
-This file serves as the "Living Memory" for the Jules agent working on the ConfluenceRefiner repository.
+This file serves as the "Living Memory" for the Jules agent working on the ConfluenceSummarizer repository.
 
 ## Repository Context
-- **Project:** ConfluenceRefiner
+- **Project:** ConfluenceSummarizer
 - **Purpose:** Ingest, analyze, and refine Confluence documentation using AI agents.
 - **Tech Stack:** Python 3.11/3.12, FastAPI, ChromaDB (RAG), Pydantic, httpx.
 - **Dependency Manager:** uv
