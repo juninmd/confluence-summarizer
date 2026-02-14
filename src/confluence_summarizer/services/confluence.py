@@ -116,13 +116,18 @@ async def get_page(page_id: str) -> ConfluencePage:
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def get_pages_from_space(space_key: str, limit: int = 50) -> List[ConfluencePage]:
+async def get_pages_from_space(
+    space_key: str,
+    limit: Optional[int] = None,
+    page_size: int = 50
+) -> List[ConfluencePage]:
     """
     Fetches all pages from a given space, handling pagination.
 
     Args:
         space_key: The key of the Confluence space.
-        limit: Max pages to fetch.
+        limit: Max pages to fetch. If None, fetches all pages.
+        page_size: Number of items requested per API call (max 50 in Confluence Cloud).
 
     Returns:
         List[ConfluencePage]: List of pages found.
@@ -132,7 +137,7 @@ async def get_pages_from_space(space_key: str, limit: int = 50) -> List[Confluen
         "spaceKey": space_key,
         "type": "page",
         "expand": "body.storage,version,space",
-        "limit": min(limit, 50)  # Fetch in chunks of up to 50
+        "limit": max(1, min(page_size, 50))
     }
 
     pages: List[ConfluencePage] = []
@@ -142,7 +147,7 @@ async def get_pages_from_space(space_key: str, limit: int = 50) -> List[Confluen
     should_close = client is not _client
 
     try:
-        while len(pages) < limit:
+        while limit is None or len(pages) < limit:
             current_params = base_params.copy()
             current_params["start"] = start
 
@@ -170,7 +175,7 @@ async def get_pages_from_space(space_key: str, limit: int = 50) -> List[Confluen
                     url=f"{CONFLUENCE_URL}{webui}"
                 )
                 pages.append(page)
-                if len(pages) >= limit:
+                if limit is not None and len(pages) >= limit:
                     break
 
             # Check for next page

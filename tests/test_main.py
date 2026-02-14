@@ -162,6 +162,14 @@ def test_ingest_space(client):
         assert "Ingestion started" in response.json()["message"]
 
 
+def test_ingest_page(client):
+    with patch("confluence_summarizer.main.process_page_ingestion", new_callable=AsyncMock):
+        response = client.post("/ingest/123")
+        assert response.status_code == 200
+        assert response.json()["page_id"] == "123"
+        assert "Ingestion started for page" in response.json()["message"]
+
+
 def test_start_space_refinement(client):
     with patch("confluence_summarizer.main.process_space_refinement", new_callable=AsyncMock) as mock_task:
         response = client.post("/refine/space/TEST_SPACE")
