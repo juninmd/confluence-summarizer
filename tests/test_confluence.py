@@ -145,6 +145,34 @@ async def test_get_pages_from_space_pagination(mock_httpx_client, reset_confluen
 
 
 @pytest.mark.asyncio
+async def test_get_pages_from_space_without_limit_fetches_all(mock_httpx_client, reset_confluence_client):
+    mock_resp1 = MagicMock()
+    mock_resp1.json.return_value = {
+        "results": [{
+            "id": "1", "title": "P1", "body": {"storage": {"value": "B1"}},
+            "version": {"number": 1}, "_links": {"webui": "/p1"}
+        }],
+        "_links": {"next": "/next"}
+    }
+
+    mock_resp2 = MagicMock()
+    mock_resp2.json.return_value = {
+        "results": [{
+            "id": "2", "title": "P2", "body": {"storage": {"value": "B2"}},
+            "version": {"number": 1}, "_links": {"webui": "/p2"}
+        }],
+        "_links": {}
+    }
+
+    mock_httpx_client.get.side_effect = [mock_resp1, mock_resp2]
+
+    pages = await confluence.get_pages_from_space("SPACE")
+
+    assert len(pages) == 2
+    assert mock_httpx_client.get.call_count == 2
+
+
+@pytest.mark.asyncio
 async def test_get_auth_missing_env(mock_httpx_client):
     # Patch the module-level variables
     with patch("confluence_summarizer.services.confluence.CONFLUENCE_USERNAME", ""), \

@@ -10,6 +10,9 @@ from .services import confluence, rag  # noqa: E402
 from .agents import refine_page  # noqa: E402
 from . import database  # noqa: E402
 
+REFINEMENT_CONCURRENCY = 5
+INGESTION_CONCURRENCY = 10
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -86,7 +89,7 @@ async def process_space_refinement(space_key: str) -> None:
         pages = await confluence.get_pages_from_space(space_key)
         logger.info(f"Found {len(pages)} pages in space {space_key} for refinement")
 
-        sem = asyncio.Semaphore(5)
+        sem = asyncio.Semaphore(REFINEMENT_CONCURRENCY)
 
         async def refine_with_sem(page: ConfluencePage):
             async with sem:
@@ -103,7 +106,7 @@ async def process_space_ingestion(space_key: str):
     try:
         pages = await confluence.get_pages_from_space(space_key)
         logger.info(f"Found {len(pages)} pages in space {space_key}")
-        sem = asyncio.Semaphore(10)
+        sem = asyncio.Semaphore(INGESTION_CONCURRENCY)
 
         async def ingest_with_sem(page: ConfluencePage):
             async with sem:
@@ -113,6 +116,19 @@ async def process_space_ingestion(space_key: str):
         logger.info(f"Ingestion completed for space {space_key}")
     except Exception as e:
         logger.error(f"Error ingesting space {space_key}: {e}", exc_info=True)
+
+
+async def process_page_ingestion(page_id: str) -> None:
+    """
+    Background task to ingest one page into the vector DB.
+    """
+    logger.info(f"Starting ingestion for page {page_id}")
+    try:
+        page = await confluence.get_page(page_id)
+        await rag.ingest_page(page)
+        logger.info(f"Ingestion completed for page {page_id}")
+    except Exception as e:
+        logger.error(f"Error ingesting page {page_id}: {e}", exc_info=True)
 
 
 @app.post("/refine/{page_id}")
@@ -160,6 +176,16 @@ async def ingest_space(space_key: str, background_tasks: BackgroundTasks):
     logger.info(f"Received ingestion request for space {space_key}")
     background_tasks.add_task(process_space_ingestion, space_key)
     return {"message": f"Ingestion started for space {space_key}"}
+
+
+@app.post("/ingest/{page_id}")
+async def ingest_page(page_id: str, background_tasks: BackgroundTasks):
+    """
+    Triggers ingestion of one page into the vector DB.
+    """
+    logger.info(f"Received ingestion request for page {page_id}")
+    background_tasks.add_task(process_page_ingestion, page_id)
+    return {"message": "Ingestion started for page", "page_id": page_id}
 
 
 @app.post("/publish/{page_id}")
