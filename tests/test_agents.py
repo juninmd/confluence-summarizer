@@ -1,14 +1,14 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from confluence_refiner.agents import common, analyst, writer, reviewer
-from confluence_refiner.models import Critique, RefinementStatus
+from confluence_summarizer.agents import common, analyst, writer, reviewer
+from confluence_summarizer.models import Critique, RefinementStatus
 import os
 
 
 @pytest.fixture
 def mock_openai():
     # Patch _get_client to return a mock client
-    with patch("confluence_refiner.agents.common._get_client") as mock_get_client:
+    with patch("confluence_summarizer.agents.common._get_client") as mock_get_client:
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         yield mock_client
@@ -47,7 +47,7 @@ async def test_call_llm_failure(mock_openai):
 
 @pytest.mark.asyncio
 async def test_analyst_success():
-    with patch("confluence_refiner.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = """
         {
             "critiques": [
@@ -67,7 +67,7 @@ async def test_analyst_success():
 
 @pytest.mark.asyncio
 async def test_analyst_empty_response():
-    with patch("confluence_refiner.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = ""
         critiques = await analyst.analyze_content("content", [])
         assert critiques == []
@@ -75,7 +75,7 @@ async def test_analyst_empty_response():
 
 @pytest.mark.asyncio
 async def test_analyst_invalid_json():
-    with patch("confluence_refiner.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = "NOT JSON"
         critiques = await analyst.analyze_content("content", [])
         assert critiques == []
@@ -83,7 +83,7 @@ async def test_analyst_invalid_json():
 
 @pytest.mark.asyncio
 async def test_writer_success():
-    with patch("confluence_refiner.agents.writer.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.writer.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = "Rewritten Content"
         critique = Critique(issue_type="A", description="B", severity="info", suggestion="C")
 
@@ -93,7 +93,7 @@ async def test_writer_success():
 
 @pytest.mark.asyncio
 async def test_writer_with_context():
-    with patch("confluence_refiner.agents.writer.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.writer.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = "Rewritten Content with Context"
         critique = Critique(issue_type="A", description="B", severity="info", suggestion="C")
         context = ["Relevant Info 1", "Relevant Info 2"]
@@ -110,7 +110,7 @@ async def test_writer_with_context():
 
 @pytest.mark.asyncio
 async def test_reviewer_approved():
-    with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = '{"status": "completed", "comments": "LGTM"}'
 
         result = await reviewer.review_content("org", "new", "critiques")
@@ -120,7 +120,7 @@ async def test_reviewer_approved():
 
 @pytest.mark.asyncio
 async def test_reviewer_rejected():
-    with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = '{"status": "rejected", "comments": "Bad"}'
 
         result = await reviewer.review_content("org", "new", "critiques")
@@ -129,7 +129,7 @@ async def test_reviewer_rejected():
 
 @pytest.mark.asyncio
 async def test_reviewer_parse_error():
-    with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = "INVALID"
 
         result = await reviewer.review_content("org", "new", "critiques")
@@ -138,7 +138,7 @@ async def test_reviewer_parse_error():
 
 @pytest.mark.asyncio
 async def test_reviewer_empty_response():
-    with patch("confluence_refiner.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
+    with patch("confluence_summarizer.agents.reviewer.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = ""
         result = await reviewer.review_content("org", "new", "critiques")
         assert result["status"] == RefinementStatus.FAILED
@@ -165,8 +165,8 @@ def test_get_client_missing_key():
     # Reset client
     common._client = None
     with patch.dict(os.environ, {}, clear=True):
-        with patch("confluence_refiner.agents.common.logger") as mock_logger:
-            with patch("confluence_refiner.agents.common.AsyncOpenAI") as mock_openai_cls:
+        with patch("confluence_summarizer.agents.common.logger") as mock_logger:
+            with patch("confluence_summarizer.agents.common.AsyncOpenAI") as mock_openai_cls:
                 client = common._get_client()
                 mock_logger.warning.assert_called_with("OPENAI_API_KEY not set. LLM calls will fail.")
                 assert client is not None

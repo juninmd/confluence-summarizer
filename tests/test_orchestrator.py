@@ -1,30 +1,30 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from confluence_refiner.agents import orchestrator
-from confluence_refiner.models import ConfluencePage, RefinementStatus, Critique, IssueSeverity
+from confluence_summarizer.agents import orchestrator
+from confluence_summarizer.models import ConfluencePage, RefinementStatus, Critique, IssueSeverity
 
 
 @pytest.fixture
 def mock_rag():
-    with patch("confluence_refiner.agents.orchestrator.rag", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.agents.orchestrator.rag", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_analyst():
-    with patch("confluence_refiner.agents.orchestrator.analyst", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.agents.orchestrator.analyst", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_writer():
-    with patch("confluence_refiner.agents.orchestrator.writer", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.agents.orchestrator.writer", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_reviewer():
-    with patch("confluence_refiner.agents.orchestrator.reviewer", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.agents.orchestrator.reviewer", new_callable=AsyncMock) as mock:
         yield mock
 
 

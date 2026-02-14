@@ -1,37 +1,37 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
-from confluence_refiner.main import app
-from confluence_refiner.models import RefinementResult, RefinementStatus, ConfluencePage
+from confluence_summarizer.main import app
+from confluence_summarizer.models import RefinementResult, RefinementStatus, ConfluencePage
 
 
 @pytest.fixture
 def client():
     # Patch init_db and init_rag to avoid real DB creation during startup
-    with patch("confluence_refiner.database.init_db", new_callable=AsyncMock), \
-         patch("confluence_refiner.services.rag.init_rag", new_callable=AsyncMock):
+    with patch("confluence_summarizer.database.init_db", new_callable=AsyncMock), \
+         patch("confluence_summarizer.services.rag.init_rag", new_callable=AsyncMock):
         with TestClient(app) as c:
             yield c
 
 
 @pytest.fixture
 def mock_confluence_get_page():
-    with patch("confluence_refiner.services.confluence.get_page", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.services.confluence.get_page", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_refine_page():
-    with patch("confluence_refiner.main.refine_page", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.main.refine_page", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_db():
     # We patch the functions in the database module that main imports
-    with patch("confluence_refiner.database.save_job", new_callable=AsyncMock) as mock_save, \
-         patch("confluence_refiner.database.get_job", new_callable=AsyncMock) as mock_get, \
-         patch("confluence_refiner.database.init_db", new_callable=AsyncMock) as mock_init:
+    with patch("confluence_summarizer.database.save_job", new_callable=AsyncMock) as mock_save, \
+         patch("confluence_summarizer.database.get_job", new_callable=AsyncMock) as mock_get, \
+         patch("confluence_summarizer.database.init_db", new_callable=AsyncMock) as mock_init:
         yield mock_save, mock_get, mock_init
 
 
@@ -80,7 +80,7 @@ def test_get_status_found(client, mock_db):
 
 @pytest.fixture
 def mock_confluence_update_page():
-    with patch("confluence_refiner.services.confluence.update_page", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.services.confluence.update_page", new_callable=AsyncMock) as mock:
         yield mock
 
 
@@ -156,14 +156,14 @@ def test_publish_page_update_failure(client, mock_confluence_get_page, mock_conf
 
 
 def test_ingest_space(client):
-    with patch("confluence_refiner.main.process_space_ingestion", new_callable=AsyncMock):
+    with patch("confluence_summarizer.main.process_space_ingestion", new_callable=AsyncMock):
         response = client.post("/ingest/space/TEST")
         assert response.status_code == 200
         assert "Ingestion started" in response.json()["message"]
 
 
 def test_start_space_refinement(client):
-    with patch("confluence_refiner.main.process_space_refinement", new_callable=AsyncMock) as mock_task:
+    with patch("confluence_summarizer.main.process_space_refinement", new_callable=AsyncMock) as mock_task:
         response = client.post("/refine/space/TEST_SPACE")
         assert response.status_code == 200
         assert "Refinement started for space TEST_SPACE" in response.json()["message"]

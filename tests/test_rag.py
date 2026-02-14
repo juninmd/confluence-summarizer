@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from confluence_refiner.services import rag
-from confluence_refiner.models import ConfluencePage
+from confluence_summarizer.services import rag
+from confluence_summarizer.models import ConfluencePage
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def test_chunk_text_empty_string():
 
 @pytest.mark.asyncio
 async def test_init_rag():
-    with patch("confluence_refiner.services.rag._get_collection") as mock_get_collection:
+    with patch("confluence_summarizer.services.rag._get_collection") as mock_get_collection:
         await rag.init_rag()
         mock_get_collection.assert_called_once()
 

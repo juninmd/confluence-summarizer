@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from confluence_refiner.services import confluence
+from confluence_summarizer.services import confluence
 
 
 @pytest.fixture
@@ -147,8 +147,8 @@ async def test_get_pages_from_space_pagination(mock_httpx_client, reset_confluen
 @pytest.mark.asyncio
 async def test_get_auth_missing_env(mock_httpx_client):
     # Patch the module-level variables
-    with patch("confluence_refiner.services.confluence.CONFLUENCE_USERNAME", ""), \
-         patch("confluence_refiner.services.confluence.CONFLUENCE_API_TOKEN", ""):
+    with patch("confluence_summarizer.services.confluence.CONFLUENCE_USERNAME", ""), \
+         patch("confluence_summarizer.services.confluence.CONFLUENCE_API_TOKEN", ""):
 
         mock_response = MagicMock()
         mock_response.status_code = 200

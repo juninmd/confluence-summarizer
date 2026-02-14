@@ -1,30 +1,30 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from confluence_refiner.main import process_refinement, process_space_ingestion, process_space_refinement
-from confluence_refiner.models import RefinementStatus, ConfluencePage
+from confluence_summarizer.main import process_refinement, process_space_ingestion, process_space_refinement
+from confluence_summarizer.models import RefinementStatus, ConfluencePage
 
 
 @pytest.fixture
 def mock_confluence():
-    with patch("confluence_refiner.main.confluence", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.main.confluence", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_rag():
-    with patch("confluence_refiner.main.rag", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.main.rag", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_db():
-    with patch("confluence_refiner.main.database", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.main.database", new_callable=AsyncMock) as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_refine_page():
-    with patch("confluence_refiner.main.refine_page", new_callable=AsyncMock) as mock:
+    with patch("confluence_summarizer.main.refine_page", new_callable=AsyncMock) as mock:
         yield mock
 
 

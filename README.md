@@ -1,4 +1,4 @@
-# Confluence Refiner
+# Confluence Summarizer
 
 A robust system to refine and standardize Confluence documentation using AI Agents.
 
@@ -36,7 +36,7 @@ This system connects to Confluence, ingests pages into a vector database (Chroma
 
 3. **Run the API**:
    ```bash
-   uv run uvicorn src.confluence_refiner.main:app --reload
+   uv run uvicorn src.confluence_summarizer.main:app --reload
    ```
 
 ## Testing
