@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from confluence_summarizer.agents import reviewer
 from confluence_summarizer.models import RefinementStatus
 
+
 @pytest.fixture
 def mock_openai():
     # Patch _get_client to return a mock client
@@ -10,6 +11,7 @@ def mock_openai():
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         yield mock_client
+
 
 @pytest.mark.asyncio
 async def test_reviewer_status_parsing(mock_openai):
@@ -29,6 +31,7 @@ async def test_reviewer_status_parsing(mock_openai):
             result = await reviewer.review_content("orig", "new", "critique")
 
             assert result["status"] == expected_status, f"Failed for response: {json_response}"
+
 
 @pytest.mark.asyncio
 async def test_reviewer_rejection_parsing(mock_openai):
