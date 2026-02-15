@@ -166,9 +166,9 @@ def test_get_client_missing_key():
     common._client = None
     with patch.dict(os.environ, {}, clear=True):
         with patch("confluence_summarizer.agents.common.logger") as mock_logger:
-            with patch("confluence_summarizer.agents.common.AsyncOpenAI") as mock_openai_cls:
-                client = common._get_client()
-                mock_logger.warning.assert_called_with("OPENAI_API_KEY not set. LLM calls will fail.")
-                assert client is not None
+            # We don't need to patch AsyncOpenAI because it shouldn't be called
+            client = common._get_client()
+            mock_logger.warning.assert_called_with("OPENAI_API_KEY not set. LLM calls will fail.")
+            assert client is None
     # Cleanup
     common._client = None

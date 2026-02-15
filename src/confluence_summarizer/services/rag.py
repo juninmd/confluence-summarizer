@@ -38,14 +38,12 @@ async def init_rag():
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
     """
     Splits text into chunks with overlap, respecting word boundaries.
-
-    Note:
-        This uses a naive character-based splitting strategy with word boundary checking.
-        For production, consider using a semantic chunker (e.g., using NLTK, Spacy,
-        or embedding-based segmentation) to better preserve context.
     """
     if not text:
         return []
+
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
 
     chunks: List[str] = []
     start = 0
@@ -54,23 +52,31 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[st
     while start < text_len:
         end = min(start + chunk_size, text_len)
 
-        # If not at the end, try to find a suitable break point (whitespace)
+        # If we are not at the end of the text, try to break at a space
         if end < text_len:
             segment = text[start:end]
             last_space = segment.rfind(' ')
             if last_space != -1:
                 end = start + last_space
 
-        # Force break if no progress (e.g. huge word)
+        # Ensure we move forward. If a word is longer than chunk_size, we split it.
+        # The loop condition `start < text_len` and `end = min(...)` usually ensures progress,
+        # but if `last_space` logic made `end` equal to `start` (e.g. space at index 0?), we fix it.
         if end <= start:
             end = min(start + chunk_size, text_len)
 
-        chunks.append(text[start:end].strip())
+        # Extract chunk
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
 
         if end == text_len:
             break
 
-        start = max(start + 1, end - overlap)
+        # Calculate next start position
+        next_start = end - overlap
+        # Ensure progress: strictly greater than current start
+        start = max(start + 1, next_start)
 
     return chunks
 

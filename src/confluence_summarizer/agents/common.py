@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from typing import Optional
 from openai import AsyncOpenAI
 
@@ -8,31 +9,31 @@ logger = logging.getLogger(__name__)
 _client: Optional[AsyncOpenAI] = None
 
 
-def _get_client() -> AsyncOpenAI:
+def _get_client() -> Optional[AsyncOpenAI]:
     global _client
     if _client is None:
-        # We allow api_key to be None here (OpenAI lib might raise later, or we check it)
-        # But this prevents import-time crashes.
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             logger.warning("OPENAI_API_KEY not set. LLM calls will fail.")
-        _client = AsyncOpenAI(api_key=api_key)
+            return None
+        try:
+            _client = AsyncOpenAI(api_key=api_key)
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenAI client: {e}")
+            return None
     return _client
 
 
 def clean_json_response(response: str) -> str:
     """
     Cleans the LLM response to ensure it is valid JSON.
-    Removes Markdown code blocks (```json ... ```).
+    Removes Markdown code blocks (```json ... ```) using regex.
     """
-    cleaned = response.strip()
-    if cleaned.startswith("```"):
-        # Remove first line (```json or ```)
-        cleaned = cleaned.split("\n", 1)[1]
-        # Remove last line (```)
-        if cleaned.endswith("```"):
-            cleaned = cleaned.rsplit("\n", 1)[0]
-    return cleaned.strip()
+    # Regex to find content within ```json ... ``` or just ``` ... ```
+    match = re.search(r"```(?:json)?\s*(.*?)\s*```", response, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return response.strip()
 
 
 async def call_llm(
@@ -45,6 +46,9 @@ async def call_llm(
     Calls the LLM with the given prompt.
     """
     client = _get_client()
+    if not client:
+        logger.error("Cannot call LLM: Client not initialized (missing API key?)")
+        return ""
 
     messages = [
         {"role": "system", "content": system_prompt},
