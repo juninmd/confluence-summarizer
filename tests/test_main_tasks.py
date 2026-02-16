@@ -1,6 +1,11 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from confluence_summarizer.main import process_refinement, process_space_ingestion, process_space_refinement
+from confluence_summarizer.main import (
+    process_refinement,
+    process_space_ingestion,
+    process_space_refinement,
+    process_page_ingestion,
+)
 from confluence_summarizer.models import RefinementStatus, ConfluencePage
 
 
@@ -74,6 +79,25 @@ async def test_process_space_ingestion_failure(mock_confluence):
 
     await process_space_ingestion("S")
     # Should complete without error
+
+
+@pytest.mark.asyncio
+async def test_process_page_ingestion_success(mock_confluence, mock_rag):
+    mock_confluence.get_page.return_value = ConfluencePage(
+        id="1", title="T", body="B", space_key="S", version=1, url="u"
+    )
+
+    await process_page_ingestion("1")
+
+    mock_rag.ingest_page.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_process_page_ingestion_failure(mock_confluence):
+    mock_confluence.get_page.side_effect = Exception("Fail")
+
+    # Should not raise
+    await process_page_ingestion("1")
 
 
 @pytest.mark.asyncio
