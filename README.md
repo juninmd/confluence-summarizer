@@ -27,10 +27,8 @@ This system connects to Confluence, ingests pages into a vector database (Chroma
 
 ### RAG Ingestion
 
-- `POST /ingest/{page_id}`: Ingest one specific page into ChromaDB (**RAG por página**).
+- `POST /ingest/{page_id}`: Ingest one specific page into ChromaDB (page-level RAG).
 - `POST /ingest/space/{space_key}`: Ingest all pages from a space.
-
-> ✅ **Verificação solicitada:** existe endpoint de geração/atualização da base RAG por página via API: `POST /ingest/{page_id}`.
 
 ## Performance Notes
 
@@ -61,7 +59,7 @@ This system connects to Confluence, ingests pages into a vector database (Chroma
    uv run uvicorn src.confluence_summarizer.main:app --reload
    ```
 
-## Testing
+## Development & Verification
 
 Run the test suite:
 ```bash
@@ -71,6 +69,11 @@ uv run pytest
 Run type checking:
 ```bash
 uv run pyright src
+```
+
+Run linting:
+```bash
+uv run flake8 src
 ```
 
 ## Agents
