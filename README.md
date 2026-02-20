@@ -79,3 +79,32 @@ uv run flake8 src
 ## Agents
 
 See `agents.md` for detailed agent personas and workflows.
+
+## Troubleshooting
+
+### Missing Environment Variables
+
+If you see errors related to `OPENAI_API_KEY` or `CONFLUENCE_URL`, ensure your `.env` file is correctly formatted and located in the root directory.
+
+- **OPENAI_API_KEY**: Required for Agent functionality. If missing, the agents will return empty responses or skip processing.
+- **CONFLUENCE_CREDENTIALS**: Check that `CONFLUENCE_USERNAME` matches your Atlassian email and `CONFLUENCE_API_TOKEN` is a valid API token (not your password).
+
+### Database Locks
+
+The system uses SQLite in WAL mode. If you encounter "database is locked" errors, ensure no other process (like a DB browser) is holding a write lock on `jobs.db`.
+
+## Testing
+
+The project maintains high test coverage for core logic.
+
+To run the full test suite with coverage report:
+
+```bash
+uv run pytest --cov=src --cov-report=term-missing
+```
+
+To run a specific test file:
+
+```bash
+uv run pytest tests/test_agents.py
+```
