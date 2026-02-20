@@ -14,12 +14,13 @@ def _get_client() -> Optional[AsyncOpenAI]:
     if _client is None:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            logger.warning("OPENAI_API_KEY not set. LLM calls will fail.")
+            logger.warning("OPENAI_API_KEY not set in environment variables. LLM capabilities will be disabled.")
             return None
         try:
             _client = AsyncOpenAI(api_key=api_key)
+            logger.info("OpenAI client initialized successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}")
+            logger.error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
             return None
     return _client
 
@@ -47,7 +48,7 @@ async def call_llm(
     """
     client = _get_client()
     if not client:
-        logger.error("Cannot call LLM: Client not initialized (missing API key?)")
+        logger.warning("Skipping LLM call because client is not initialized.")
         return ""
 
     messages = [
