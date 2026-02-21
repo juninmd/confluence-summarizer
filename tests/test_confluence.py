@@ -1,4 +1,5 @@
 import pytest
+import tenacity
 from unittest.mock import MagicMock, patch, AsyncMock
 from confluence_summarizer.services import confluence
 
@@ -241,3 +242,40 @@ async def test_get_pages_limit_reached(mock_httpx_client):
 
     assert len(pages) == 1
     assert pages[0].id == "1"
+
+
+@pytest.mark.asyncio
+async def test_get_auth_warning():
+    # Patch module-level variables to empty
+    with patch("confluence_summarizer.services.confluence.CONFLUENCE_USERNAME", ""), \
+         patch("confluence_summarizer.services.confluence.CONFLUENCE_API_TOKEN", ""):
+        with patch("confluence_summarizer.services.confluence.logger") as mock_logger:
+            auth = confluence._get_auth()
+            assert auth is None
+            mock_logger.warning.assert_called_with("Confluence credentials not set. API calls may fail.")
+
+
+@pytest.mark.asyncio
+async def test_get_pages_from_space_exception_finally(mock_httpx_client, reset_confluence_client):
+    # Ensure client is closed even if exception occurs
+    mock_httpx_client.get.side_effect = Exception("Network Error")
+
+    with pytest.raises(tenacity.RetryError):
+        await confluence.get_pages_from_space("SPACE")
+
+    # Verify close was called
+    mock_httpx_client.aclose.assert_awaited()
+
+@pytest.mark.asyncio
+async def test_get_pages_from_space_with_shared_client(mock_httpx_client, reset_confluence_client):
+    # Set shared client
+    confluence._client = mock_httpx_client
+
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"results": []}
+    mock_httpx_client.get.return_value = mock_resp
+
+    await confluence.get_pages_from_space("SPACE")
+
+    # Should NOT close shared client
+    mock_httpx_client.aclose.assert_not_awaited()

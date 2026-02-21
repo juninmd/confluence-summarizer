@@ -160,9 +160,8 @@ def _query_context(text: str, n_results: int = 3, exclude_page_id: Optional[str]
     if results and results.get("documents"):
         # results['documents'] is a List[List[str]] (one list per query)
         docs = results["documents"]
-        if docs and len(docs) > 0:
-            # Pyright sees docs[0] as List[Document] which is List[str]
-            return docs[0]  # type: ignore
+        # Pyright sees docs[0] as List[Document] which is List[str]
+        return docs[0]  # type: ignore
 
     return []
 

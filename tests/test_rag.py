@@ -52,6 +52,20 @@ def test_chunk_text_empty_string():
     assert chunks == []
 
 
+def test_chunk_text_spaces():
+    # Covers implicit else of "if chunk:"
+    text = "   "
+    chunks = rag.chunk_text(text)
+    assert chunks == []
+
+
+def test_chunk_text_invalid_size():
+    with pytest.raises(ValueError):
+        rag.chunk_text("text", chunk_size=0)
+    with pytest.raises(ValueError):
+        rag.chunk_text("text", chunk_size=-1)
+
+
 @pytest.mark.asyncio
 async def test_init_rag():
     with patch("confluence_summarizer.services.rag._get_collection") as mock_get_collection:
@@ -128,5 +142,19 @@ async def test_query_context_empty(mock_chroma):
     assert results == []
 
     mock_chroma.query.return_value = {}  # No documents key
+    results = await rag.query_context("query")
+    assert results == []
+
+
+@pytest.mark.asyncio
+async def test_query_context_none_results(mock_chroma):
+    mock_chroma.query.return_value = None
+    results = await rag.query_context("query")
+    assert results == []
+
+
+@pytest.mark.asyncio
+async def test_query_context_documents_is_none(mock_chroma):
+    mock_chroma.query.return_value = {"documents": None}
     results = await rag.query_context("query")
     assert results == []
