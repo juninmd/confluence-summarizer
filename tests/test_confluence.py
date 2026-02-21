@@ -266,6 +266,7 @@ async def test_get_pages_from_space_exception_finally(mock_httpx_client, reset_c
     # Verify close was called
     mock_httpx_client.aclose.assert_awaited()
 
+
 @pytest.mark.asyncio
 async def test_get_pages_from_space_with_shared_client(mock_httpx_client, reset_confluence_client):
     # Set shared client
