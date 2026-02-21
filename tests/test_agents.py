@@ -174,3 +174,33 @@ def test_get_client_missing_key():
             assert client is None
     # Cleanup
     common._client = None
+
+
+def test_get_client_success():
+    common._client = None
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=True):
+        with patch("confluence_summarizer.agents.common.AsyncOpenAI") as MockOpenAI:
+            client = common._get_client()
+            MockOpenAI.assert_called_once_with(api_key="sk-test")
+            assert client is not None
+            # Verify singleton behavior
+            client2 = common._get_client()
+            assert client2 is client
+            MockOpenAI.assert_called_once()
+    common._client = None
+
+
+def test_get_client_failure():
+    common._client = None
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=True):
+        with patch("confluence_summarizer.agents.common.AsyncOpenAI", side_effect=Exception("Init Error")):
+            client = common._get_client()
+            assert client is None
+    common._client = None
+
+
+@pytest.mark.asyncio
+async def test_call_llm_no_client():
+    with patch("confluence_summarizer.agents.common._get_client", return_value=None):
+        response = await common.call_llm("prompt")
+        assert response == ""
