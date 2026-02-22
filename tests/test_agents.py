@@ -69,16 +69,16 @@ async def test_analyst_success():
 async def test_analyst_empty_response():
     with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = ""
-        critiques = await analyst.analyze_content("content", [])
-        assert critiques == []
+        with pytest.raises(RuntimeError, match="Analyst Agent failed to generate a response"):
+            await analyst.analyze_content("content", [])
 
 
 @pytest.mark.asyncio
 async def test_analyst_invalid_json():
     with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = "NOT JSON"
-        critiques = await analyst.analyze_content("content", [])
-        assert critiques == []
+        with pytest.raises(RuntimeError, match="Analyst Agent failed to parse response"):
+            await analyst.analyze_content("content", [])
 
 
 @pytest.mark.asyncio
@@ -106,6 +106,14 @@ async def test_writer_with_context():
         prompt = args[0]
         assert "Relevant Info 1" in prompt
         assert "Relevant Info 2" in prompt
+
+
+@pytest.mark.asyncio
+async def test_writer_empty_response():
+    with patch("confluence_summarizer.agents.writer.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = ""
+        with pytest.raises(RuntimeError, match="Writer Agent failed to rewrite content"):
+            await writer.rewrite_content("original", [])
 
 
 @pytest.mark.asyncio

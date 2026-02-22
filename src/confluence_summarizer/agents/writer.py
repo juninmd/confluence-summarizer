@@ -68,4 +68,7 @@ async def rewrite_content(original_content: str, critiques: List[Critique], cont
     Rewrite the content:
     """
 
-    return await call_llm(prompt, system_prompt=SYSTEM_PROMPT)
+    response = await call_llm(prompt, system_prompt=SYSTEM_PROMPT)
+    if not response:
+        raise RuntimeError("Writer Agent failed to rewrite content (empty output).")
+    return response

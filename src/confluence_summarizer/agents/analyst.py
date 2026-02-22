@@ -58,7 +58,7 @@ async def analyze_content(content: str, context: List[str]) -> List[Critique]:
 
     response = await call_llm(prompt, system_prompt=SYSTEM_PROMPT, json_mode=True)
     if not response:
-        return []
+        raise RuntimeError("Analyst Agent failed to generate a response (empty output).")
 
     try:
         cleaned_response = clean_json_response(response)
@@ -67,4 +67,4 @@ async def analyze_content(content: str, context: List[str]) -> List[Critique]:
         return [Critique(**c) for c in critiques_data]
     except Exception as e:
         logger.error(f"Error parsing analyst response: {e}\nResponse was: {response}", exc_info=True)
-        return []
+        raise RuntimeError(f"Analyst Agent failed to parse response: {e}")
