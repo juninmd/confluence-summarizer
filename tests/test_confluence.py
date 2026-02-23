@@ -280,3 +280,20 @@ async def test_get_pages_from_space_with_shared_client(mock_httpx_client, reset_
 
     # Should NOT close shared client
     mock_httpx_client.aclose.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_init_client_idempotent(reset_confluence_client):
+    confluence.init_client()
+    client1 = confluence._client
+    assert client1 is not None
+    confluence.init_client()
+    client2 = confluence._client
+    assert client2 is client1
+
+
+@pytest.mark.asyncio
+async def test_close_client_safe(reset_confluence_client):
+    confluence._client = None
+    # Should not raise
+    await confluence.close_client()
