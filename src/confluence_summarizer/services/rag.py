@@ -71,7 +71,9 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[st
             chunks.append(chunk)
 
         if end == text_len:
-            break
+            # Force loop termination naturally by setting start >= text_len
+            start = text_len
+            continue
 
         # Calculate next start position
         next_start = end - overlap
