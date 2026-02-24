@@ -66,6 +66,27 @@ async def test_analyst_success():
 
 
 @pytest.mark.asyncio
+async def test_analyst_uppercase_severity():
+    with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = """
+        {
+            "critiques": [
+                {
+                    "issue_type": "Clarity",
+                    "description": "Unclear",
+                    "severity": "WARNING",
+                    "suggestion": "Fix"
+                }
+            ]
+        }
+        """
+        critiques = await analyst.analyze_content("content", [])
+        assert len(critiques) == 1
+        assert critiques[0].issue_type == "Clarity"
+        assert critiques[0].severity == "warning"
+
+
+@pytest.mark.asyncio
 async def test_analyst_empty_response():
     with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
         mock_llm.return_value = ""
