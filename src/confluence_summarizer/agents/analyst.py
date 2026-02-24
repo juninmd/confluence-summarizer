@@ -64,6 +64,10 @@ async def analyze_content(content: str, context: List[str]) -> List[Critique]:
         cleaned_response = clean_json_response(response)
         data = json.loads(cleaned_response)
         critiques_data = data.get("critiques", [])
+        # Normalize severity to lowercase to ensure Pydantic validation
+        for c in critiques_data:
+            if "severity" in c and isinstance(c["severity"], str):
+                c["severity"] = c["severity"].lower()
         return [Critique(**c) for c in critiques_data]
     except Exception as e:
         logger.error(f"Error parsing analyst response: {e}\nResponse was: {response}", exc_info=True)
