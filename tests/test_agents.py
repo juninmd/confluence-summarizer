@@ -234,6 +234,7 @@ async def test_call_llm_no_client():
         response = await common.call_llm("prompt")
         assert response == ""
 
+
 @pytest.mark.asyncio
 async def test_analyst_missing_severity():
     with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
