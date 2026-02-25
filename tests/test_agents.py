@@ -233,3 +233,21 @@ async def test_call_llm_no_client():
     with patch("confluence_summarizer.agents.common._get_client", return_value=None):
         response = await common.call_llm("prompt")
         assert response == ""
+
+@pytest.mark.asyncio
+async def test_analyst_missing_severity():
+    with patch("confluence_summarizer.agents.analyst.call_llm", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = """
+        {
+            "critiques": [
+                {
+                    "issue_type": "Clarity",
+                    "description": "Unclear",
+                    "suggestion": "Fix"
+                }
+            ]
+        }
+        """
+        # Missing "severity" should cause ValidationError -> caught -> RuntimeError
+        with pytest.raises(RuntimeError, match="Analyst Agent failed to parse response"):
+            await analyst.analyze_content("content", [])
