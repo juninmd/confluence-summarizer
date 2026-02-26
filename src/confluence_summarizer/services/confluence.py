@@ -62,6 +62,7 @@ def _get_client() -> httpx.AsyncClient:
     if _client:
         return _client
     # Fallback/Warning: This shouldn't ideally happen in prod if lifecycle is managed correctly
+    logger.warning("Using fallback HTTP client - init_client() might not have been called.")
     return httpx.AsyncClient(timeout=30.0)
 
 
