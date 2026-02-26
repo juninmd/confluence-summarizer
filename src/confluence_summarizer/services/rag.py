@@ -9,6 +9,7 @@ Features:
 """
 
 import os
+import logging
 import asyncio
 from typing import List, Optional, Any, cast, Dict
 import chromadb
@@ -16,6 +17,8 @@ from chromadb.api.types import OneOrMany, Metadata, Where
 from ..models import ConfluencePage
 
 CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./chroma_db")
+
+logger = logging.getLogger(__name__)
 
 _client = None
 _collection = None
@@ -97,9 +100,9 @@ def _ingest_page(page: ConfluencePage) -> None:
         # We need to cast the dictionary to the Where type expected by ChromaDB
         where_clause = cast(Where, {"page_id": page.id})
         collection.delete(where=where_clause)
-    except Exception:
+    except Exception as e:
         # Might fail if collection empty or other issues, but usually fine.
-        pass
+        logger.warning(f"Failed to delete existing chunks for page {page.id}: {e}")
 
     chunks = chunk_text(page.body)
 
