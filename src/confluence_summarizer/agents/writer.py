@@ -1,74 +1,36 @@
-"""
-Writer Agent
-============
-The Writer Agent is the second step in the refinement pipeline.
-It takes the critiques from the Analyst Agent and the original content to produce a refined version.
-
-Responsibilities:
-- Rewrite the documentation to address all critiques.
-- Improve clarity, conciseness, and tone.
-- Ensure factual consistency by using the provided context.
-- Maintain the original logical structure unless confusing.
-- Format code blocks and headers correctly.
-
-Input:
-- Original content.
-- List of critiques.
-- Related context (RAG).
-
-Output:
-- The rewritten Markdown content.
-"""
-
 from typing import List, Optional
-from ..models import Critique
-from .common import call_llm
+from confluence_summarizer.models import AnalysisResult
+from confluence_summarizer.agents.common import generate_response
 
-SYSTEM_PROMPT = """
-You are the Writer Agent. Rewrite the documentation to address the critiques provided.
-Maintain the technical accuracy but improve style and formatting.
-If related context is provided, use it to ensure consistency and correctness.
-Output only the rewritten Markdown content. Do not include preamble or explanation.
-"""
+async def rewrite(text: str, analysis: AnalysisResult, context: List[str]) -> Optional[str]:
+    """Rewrites text using the Writer Agent."""
+    system_prompt = """
+    You are an expert Confluence Documentation Writer Agent.
+    Your task is to rewrite and refine the provided documentation.
+    You must use the original text, the Analyst's critique, and the retrieved context (RAG)
+    to ensure factual consistency, standardization, and clarity.
 
-
-async def rewrite_content(original_content: str, critiques: List[Critique], context: Optional[List[str]] = None) -> str:
+    Do not introduce contradictions or hallucinations. Focus on clarity and consistency.
+    Output only the rewritten text in Confluence Storage Format (HTML/XML).
     """
-    Rewrites the content based on critiques and available context.
 
-    Args:
-        original_content: The original page content.
-        critiques: A list of critiques identified by the Analyst Agent.
-        context: Optional list of related documents for context.
-
-    Returns:
-        str: The rewritten content in Markdown format.
-    """
-    if context is None:
-        context = []
-
-    critiques_list = [
-        f"- [{c.severity}] {c.issue_type}: {c.description}. Suggestion: {c.suggestion}"
-        for c in critiques
-    ]
-    critiques_str = "\n".join(critiques_list)
-
-    context_str = "\n---\n".join(context) if context else "No context provided."
+    critiques_text = "\n".join(
+        [f"- {c.finding} (Severity: {c.severity}) -> {c.recommendation}" for c in analysis.critiques]
+    )
+    context_text = "\n\n---\n\n".join(context) if context else "No additional context available."
 
     prompt = f"""
-    Original Content:
-    {original_content}
+    Rewrite the following Confluence page content based on the critiques and context.
 
-    CONTEXT (Related pages):
-    {context_str}
+    Original Text:
+    {text}
 
-    Critiques to Address:
-    {critiques_str}
+    Analyst Critiques:
+    {critiques_text}
 
-    Rewrite the content:
+    Retrieved Context (for cross-checking facts):
+    {context_text}
     """
 
-    response = await call_llm(prompt, system_prompt=SYSTEM_PROMPT)
-    if not response:
-        raise RuntimeError("Writer Agent failed to rewrite content (empty output).")
-    return response
+    response_text = await generate_response(prompt, system_prompt)
+    return response_text

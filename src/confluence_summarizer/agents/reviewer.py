@@ -1,79 +1,56 @@
-"""
-Reviewer Agent
-==============
-The Reviewer Agent is the final step in the refinement pipeline.
-It acts as a gatekeeper before content is saved or published.
-
-Responsibilities:
-- Validate that the rewritten content is accurate and clear.
-- Ensure that the critiques from the Analyst Agent were addressed.
-- Check for hallucinations or new errors introduced by the Writer.
-- Provide a final status (COMPLETED/REJECTED) and comments.
-
-Input:
-- Original content.
-- Rewritten content.
-- Summary of critiques.
-
-Output:
-- A decision status and comments.
-"""
-
 import json
-import logging
-from typing import Dict, Any
-from ..models import RefinementStatus
-from .common import call_llm, clean_json_response
+from typing import Optional
+from confluence_summarizer.models import ReviewResult, RefinementStatus
+from confluence_summarizer.agents.common import generate_response, clean_json_response
 
-logger = logging.getLogger(__name__)
+async def review(original_text: str, rewritten_text: str) -> Optional[ReviewResult]:
+    """Reviews text using the Reviewer Agent."""
+    system_prompt = """
+    You are an expert Confluence Documentation Quality Assurance Agent.
+    Your task is to compare the rewritten documentation against the original to ensure all critiques were addressed,
+    no unintended changes were introduced, and no hallucinations were added.
 
-SYSTEM_PROMPT = """
-You are the Reviewer Agent. Validate if the rewritten content is acceptable.
-Check if critiques were addressed and if no new errors were introduced.
-Output a JSON object with "status" (must be one of: "approved", "rejected") and "comments" (string).
-"""
-
-
-async def review_content(original: str, rewritten: str, critiques_summary: str) -> Dict[str, Any]:
+    Provide your response as a JSON object matching this schema:
+    {
+      "status": "APPROVED", "REJECTED", or "NEEDS_REVISION",
+      "comments": "Comments explaining the review decision."
+    }
     """
-    Reviews the rewritten content against the original and the critiques.
 
-    Args:
-        original: The original content.
-        rewritten: The rewritten content.
-        critiques_summary: A summary of the critiques that were supposed to be addressed.
-
-    Returns:
-        Dict[str, Any]: A dictionary containing "status" (RefinementStatus) and "comments" (str).
-    """
     prompt = f"""
-    Original Content:
-    {original}
+    Compare the rewritten documentation against the original.
 
-    Critiques that were raised:
-    {critiques_summary}
+    Original Text:
+    {original_text}
 
-    Rewritten Content:
-    {rewritten}
-
-    Provide your review.
+    Rewritten Text:
+    {rewritten_text}
     """
 
-    response = await call_llm(prompt, system_prompt=SYSTEM_PROMPT, json_mode=True)
-    if not response:
-        return {"status": RefinementStatus.FAILED, "comments": "No response from LLM"}
+    response_text = await generate_response(prompt, system_prompt)
+
+    if not response_text:
+        return None
 
     try:
-        cleaned_response = clean_json_response(response)
-        data = json.loads(cleaned_response)
-        # Normalize status
-        status_str = data.get("status", "").lower()
-        if status_str in ["completed", "approved", "accepted"]:
-            status = RefinementStatus.COMPLETED
-        else:
-            status = RefinementStatus.REJECTED
+        cleaned_json = clean_json_response(response_text)
+        data = json.loads(cleaned_json)
 
-        return {"status": status, "comments": data.get("comments", "")}
-    except Exception as e:
-        logger.error(f"Error parsing reviewer response: {e}\nResponse was: {response}", exc_info=True)
-        return {"status": RefinementStatus.FAILED, "comments": "Failed to parse reviewer output"}
+        status_str = data.get("status", "").upper()
+
+        # Handle aliases and mapping
+        if status_str in ("APPROVED", "ACCEPTED", "COMPLETED"):
+            status_str = "COMPLETED"
+
+        # Map to RefinementStatus
+        try:
+            status = RefinementStatus(status_str)
+        except ValueError:
+            status = RefinementStatus.NEEDS_REVISION
+
+        data["status"] = status
+        return ReviewResult(**data)
+    except json.JSONDecodeError:
+        return None
+    except Exception:
+        return None
