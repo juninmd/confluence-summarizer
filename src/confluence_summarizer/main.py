@@ -1,221 +1,148 @@
-from dotenv import load_dotenv
-load_dotenv()
+import asyncio
+import logging
+from typing import List, Dict, Any
+from fastapi import FastAPI, BackgroundTasks, HTTPException
+from pydantic import BaseModel
+from contextlib import asynccontextmanager
+import dotenv
+from confluence_summarizer.models import RefinementJob, RefinementStatus
+from confluence_summarizer.database import init_db, save_job, get_job
+from confluence_summarizer.services.confluence import init_client, close_client, get_page_content, get_space_pages
+from confluence_summarizer.services.rag import ingest_page, query_context
+from confluence_summarizer.agents.analyst import analyze
+from confluence_summarizer.agents.writer import rewrite
+from confluence_summarizer.agents.reviewer import review
 
-import logging  # noqa: E402
-from contextlib import asynccontextmanager  # noqa: E402
-import asyncio  # noqa: E402
-from fastapi import FastAPI, BackgroundTasks, HTTPException  # noqa: E402
-from .models import RefinementResult, RefinementStatus, ConfluencePage  # noqa: E402
-from .services import confluence, rag  # noqa: E402
-from .agents import refine_page  # noqa: E402
-from . import database  # noqa: E402
+dotenv.load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 REFINEMENT_CONCURRENCY = 5
 INGESTION_CONCURRENCY = 10
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing application resources...")
-    await database.init_db()
-    confluence.init_client()
-    await rag.init_rag()
+    init_db()
+    init_client()
     yield
-    logger.info("Cleaning up application resources...")
-    await confluence.close_client()
+    await close_client()
 
+app = FastAPI(title="Confluence Summarizer", lifespan=lifespan)
 
-app = FastAPI(
-    title="Confluence Summarizer",
-    description="A robust system to refine and standardize Confluence documentation using AI Agents.",
-    version="0.1.0",
-    lifespan=lifespan
-)
+class RefinePageRequest(BaseModel):
+    space_key: str
 
+class RefineSpaceRequest(BaseModel):
+    pass  # Add configuration if needed
 
-async def _perform_refinement(page: ConfluencePage) -> None:
-    """
-    Internal helper to perform refinement on a single page.
-    """
-    logger.info(f"Starting refinement for page {page.id}")
+async def _perform_refinement(job: RefinementJob) -> None:
+    """Core logic to refine a single Confluence page."""
     try:
-        result = await refine_page(page)
-        await database.save_job(result)
-        logger.info(f"Refinement completed for page {page.id} with status {result.status}")
+        # 1. Fetch
+        logger.info(f"Refining page {job.page_id}")
+        content = await get_page_content(job.page_id)
+        job.original_content = content
+        job.status = RefinementStatus.PROCESSING
+        await save_job(job)
+
+        # 2. Analyze
+        logger.info(f"Analyzing page {job.page_id}")
+        analysis = await analyze(content)
+        if not analysis:
+            raise ValueError("Analysis failed.")
+        job.analysis = analysis
+        await save_job(job)
+
+        # 3. Retrieve Context
+        logger.info(f"Querying context for page {job.page_id}")
+        context_queries = [critique.finding for critique in analysis.critiques]
+        context: List[str] = []
+        for q in context_queries:
+            results = await query_context(q)
+            context.extend(results)
+
+        # 4. Rewrite
+        logger.info(f"Rewriting page {job.page_id}")
+        rewritten = await rewrite(content, analysis, list(set(context)))
+        if not rewritten:
+            raise ValueError("Rewrite failed.")
+        job.refined_content = rewritten
+        await save_job(job)
+
+        # 5. Review
+        logger.info(f"Reviewing page {job.page_id}")
+        review_res = await review(content, rewritten)
+        if not review_res:
+            raise ValueError("Review failed.")
+        job.review = review_res
+        job.status = review_res.status
+        await save_job(job)
+
     except Exception as e:
-        logger.error(f"Refinement failed for page {page.id}: {e}", exc_info=True)
-        # Update job with error
-        result = RefinementResult(
-            page_id=page.id,
-            original_content=page.body,
-            status=RefinementStatus.FAILED,
-            reviewer_comments=str(e)
-        )
-        await database.save_job(result)
+        logger.error(f"Error refining page {job.page_id}: {e}", exc_info=True)
+        job.status = RefinementStatus.FAILED
+        job.error_message = str(e)
+        await save_job(job)
 
-
-async def process_refinement(page_id: str) -> None:
-    """
-    Background task to process the refinement of a single page.
-    """
-    logger.info(f"Starting refinement process for page {page_id}")
+async def _process_space(space_key: str) -> None:
+    """Processes an entire space."""
     try:
-        page = await confluence.get_page(page_id)
-        await _perform_refinement(page)
-    except Exception as e:
-        logger.error(f"Failed to fetch page {page_id}: {e}", exc_info=True)
-        result = RefinementResult(
-            page_id=page_id,
-            original_content="",
-            status=RefinementStatus.FAILED,
-            reviewer_comments=f"Failed to fetch page: {str(e)}"
-        )
-        await database.save_job(result)
+        logger.info(f"Fetching pages for space {space_key}")
+        pages = await get_space_pages(space_key)
 
-
-async def process_space_refinement(space_key: str) -> None:
-    """
-    Background task to process refinement for all pages in a space.
-    """
-    logger.info(f"Starting space refinement for {space_key}")
-    try:
-        pages = await confluence.get_pages_from_space(space_key)
-        logger.info(f"Found {len(pages)} pages in space {space_key} for refinement")
-
-        sem = asyncio.Semaphore(REFINEMENT_CONCURRENCY)
-
-        async def refine_with_sem(page: ConfluencePage):
-            async with sem:
-                await _perform_refinement(page)
-
-        await asyncio.gather(*(refine_with_sem(page) for page in pages))
-        logger.info(f"Space refinement completed for {space_key}")
-    except Exception as e:
-        logger.error(f"Error refining space {space_key}: {e}", exc_info=True)
-
-
-async def process_space_ingestion(space_key: str):
-    logger.info(f"Starting ingestion for space {space_key}")
-    try:
-        pages = await confluence.get_pages_from_space(space_key)
-        logger.info(f"Found {len(pages)} pages in space {space_key}")
+        # Ingest in parallel with concurrency limit
         sem = asyncio.Semaphore(INGESTION_CONCURRENCY)
 
-        async def ingest_with_sem(page: ConfluencePage):
+        async def ingest_task(page: Dict[str, Any]):
             async with sem:
-                await rag.ingest_page(page)
+                page_id = page["id"]
+                try:
+                    content = await get_page_content(page_id)
+                    await ingest_page(page_id, space_key, content)
+                except Exception as e:
+                    logger.warning(f"Failed to ingest page {page_id}: {e}")
 
-        await asyncio.gather(*(ingest_with_sem(page) for page in pages))
-        logger.info(f"Ingestion completed for space {space_key}")
+        logger.info(f"Ingesting {len(pages)} pages for space {space_key}")
+        await asyncio.gather(*(ingest_task(page) for page in pages))
+
+        # Refine in parallel with concurrency limit
+        sem_refine = asyncio.Semaphore(REFINEMENT_CONCURRENCY)
+
+        async def refine_task(page: Dict[str, Any]):
+            async with sem_refine:
+                job = RefinementJob(page_id=page["id"], space_key=space_key)
+                await save_job(job)
+                await _perform_refinement(job)
+
+        logger.info(f"Refining {len(pages)} pages for space {space_key}")
+        await asyncio.gather(*(refine_task(page) for page in pages))
+        logger.info(f"Finished processing space {space_key}")
+
     except Exception as e:
-        logger.error(f"Error ingesting space {space_key}: {e}", exc_info=True)
-
-
-async def process_page_ingestion(page_id: str) -> None:
-    """
-    Background task to ingest one page into the vector DB.
-    """
-    logger.info(f"Starting ingestion for page {page_id}")
-    try:
-        page = await confluence.get_page(page_id)
-        await rag.ingest_page(page)
-        logger.info(f"Ingestion completed for page {page_id}")
-    except Exception as e:
-        logger.error(f"Error ingesting page {page_id}: {e}", exc_info=True)
+        logger.error(f"Error processing space {space_key}: {e}", exc_info=True)
 
 
 @app.post("/refine/{page_id}")
-async def start_refinement(page_id: str, background_tasks: BackgroundTasks):
-    """
-    Starts a refinement job for a specific page.
-    """
-    logger.info(f"Received refinement request for page {page_id}")
-    job = RefinementResult(
-        page_id=page_id,
-        original_content="",
-        status=RefinementStatus.PROCESSING
-    )
-    await database.save_job(job)
-    background_tasks.add_task(process_refinement, page_id)
-    return {"message": "Refinement job started", "page_id": page_id}
+async def refine_page(page_id: str, request: RefinePageRequest, background_tasks: BackgroundTasks):
+    job = await get_job(page_id)
+    if not job:
+        job = RefinementJob(page_id=page_id, space_key=request.space_key)
+        await save_job(job)
+
+    background_tasks.add_task(_perform_refinement, job)
+    return {"message": "Refinement started.", "page_id": page_id}
 
 
 @app.post("/refine/space/{space_key}")
-async def start_space_refinement(space_key: str, background_tasks: BackgroundTasks):
-    """
-    Starts a refinement job for all pages in a space.
-    """
-    logger.info(f"Received refinement request for space {space_key}")
-    background_tasks.add_task(process_space_refinement, space_key)
-    return {"message": f"Refinement started for space {space_key}"}
+async def refine_space(space_key: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(_process_space, space_key)
+    return {"message": f"Space refinement started for {space_key}."}
 
 
-@app.get("/status/{page_id}", response_model=RefinementResult)
-async def get_status(page_id: str):
-    """
-    Checks the status of a refinement job.
-    """
-    result = await database.get_job(page_id)
-    if not result:
+@app.get("/status/{page_id}")
+async def get_page_status(page_id: str):
+    job = await get_job(page_id)
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return result
-
-
-@app.post("/ingest/space/{space_key}")
-async def ingest_space(space_key: str, background_tasks: BackgroundTasks):
-    """
-    Triggers ingestion of all pages in a space into the vector DB.
-    """
-    logger.info(f"Received ingestion request for space {space_key}")
-    background_tasks.add_task(process_space_ingestion, space_key)
-    return {"message": f"Ingestion started for space {space_key}"}
-
-
-@app.post("/ingest/{page_id}")
-async def ingest_page(page_id: str, background_tasks: BackgroundTasks):
-    """
-    Triggers ingestion of one page into the vector DB.
-    """
-    logger.info(f"Received ingestion request for page {page_id}")
-    background_tasks.add_task(process_page_ingestion, page_id)
-    return {"message": "Ingestion started for page", "page_id": page_id}
-
-
-@app.post("/publish/{page_id}")
-async def publish_page(page_id: str):
-    """
-    Publishes the refined content to Confluence.
-    """
-    logger.info(f"Received publish request for page {page_id}")
-    result = await database.get_job(page_id)
-
-    if not result:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    if result.status != RefinementStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail=f"Job status is {result.status}, cannot publish")
-
-    if not result.rewritten_content:
-        raise HTTPException(status_code=400, detail="No rewritten content available")
-
-    try:
-        current_page = await confluence.get_page(page_id)
-
-        await confluence.update_page(
-            page_id=page_id,
-            title=current_page.title,  # Keep original title for now
-            body=result.rewritten_content,
-            version_number=current_page.version
-        )
-        logger.info(f"Successfully published page {page_id}")
-        return {"message": "Page published successfully", "page_id": page_id}
-    except Exception as e:
-        logger.error(f"Failed to publish page {page_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to publish: {str(e)}")
+    return job

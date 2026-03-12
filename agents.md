@@ -1,60 +1,23 @@
-# Agent Architecture - ConfluenceSummarizer
+# Agents Architecture
 
-This document defines the personas and workflow of the AI agents in the **ConfluenceSummarizer** system.
-
-## Overview
-The system uses a Chain of Responsibility pattern where each agent has a specific role in refining documentation.
+This document defines the roles and responsibilities of the AI agents in the Confluence-summarizer system. The system uses a "Chain of Responsibility" architecture to ingest, index (RAG with ChromaDB), and refine Confluence pages.
 
 ## Personas
 
-### 1. Analyst Agent
-**Responsibility:** Read the raw text extracted from Confluence and identify issues.
-**Input:** Page text (raw), Metadata.
-**Output:** Structured list of critiques (issues).
-**Analysis Criteria:**
-- Clarity and conciseness.
-- Freshness (dates, software versions mentioned).
-- Formatting (headers, code blocks).
-- Tone (should be technical and formal).
+1.  **Analyst Agent**
+    *   **Role**: Analyzes raw text extracted from Confluence.
+    *   **Responsibilities**: Identifies flaws, outdated information, missing formatting, or inconsistencies in the documentation. Outputs a structured critique with specific findings and severity levels.
+    *   **Input**: Raw Confluence page text.
+    *   **Output**: Structured critique.
 
-### 2. Writer Agent
-**Responsibility:** Rewrite the content based on Analyst critiques and the Style Guide.
-**Input:** Original text, List of critiques, Related Context (RAG).
-**Output:** Refined text (Markdown).
-**Guidelines:**
-- Fix all critiques pointed out.
-- Use provided context to ensure factual consistency.
-- Maintain the original logical structure unless it is confusing.
-- Ensure code examples are formatted correctly.
+2.  **Writer Agent**
+    *   **Role**: Rewrites and refines the content.
+    *   **Responsibilities**: Uses the Analyst's critique, the original text, and retrieved context (RAG) to rewrite the documentation, ensuring factual consistency, standardization, and clarity.
+    *   **Input**: Raw Confluence page text, Analyst critique, retrieved context.
+    *   **Output**: Rewritten documentation.
 
-### 3. Reviewer Agent
-**Responsibility:** Validate the refined text before publication.
-**Input:** Refined text, Original text.
-**Output:** Status (APPROVED / REJECTED -> Mapped to COMPLETED/REJECTED internally) and Final Comments.
-**Criteria:**
-- Was the original meaning preserved?
-- Is the text hallucinated (invented information)?
-- Were the Analyst's critiques resolved?
-
-## Execution Flow
-
-1. **Ingestion:** `ConfluenceService` extracts the page.
-2. **Retrieval:** `RAGService` fetches relevant context (related pages) to avoid contradictions.
-3. **Analysis:** `Analyst Agent` processes content + context.
-4. **Writing:** `Writer Agent` generates the new version using critiques and context.
-5. **Review:** `Reviewer Agent` approves or requests adjustments (optional loop, currently linear).
-6. **Output:** Final result is returned via API.
-
-## Future Roadmap
-
-### 1. Robust Semantic Search
-Implement advanced embedding models and hybrid search (keyword + semantic) in `RAGService` to improve context retrieval accuracy.
-- **Action:** Integrate BM25 alongside ChromaDB vector search.
-
-### 2. Interactive Review Loop
-Allow the `Reviewer Agent` to send feedback back to the `Writer Agent` automatically if the quality threshold isn't met, creating a self-correcting loop (max retries).
-- **Action:** Modify `orchestrator.py` to implement a `while` loop with a max retry counter.
-
-### 3. Analytics Dashboard
-Create a frontend (React/Vue) to visualize jobs, compare original vs. refined content (diff view), and manually approve changes before publishing.
-- **Action:** Initialize a `frontend/` directory and build a basic job status view.
+3.  **Reviewer Agent**
+    *   **Role**: Quality assurance.
+    *   **Responsibilities**: Compares the rewritten documentation against the original to ensure all critiques were addressed and no unintended changes or hallucinations were introduced.
+    *   **Input**: Original text, rewritten text.
+    *   **Output**: Final review status (APPROVED, REJECTED, NEEDS_REVISION) and comments.

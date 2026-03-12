@@ -1,62 +1,119 @@
 import sqlite3
-import os
+import json
 import asyncio
-from typing import Optional
-from .models import RefinementResult
+from typing import Optional, List
+from confluence_summarizer.models import RefinementJob
 
-DB_PATH = os.getenv("DB_PATH", "jobs.db")
+# The jobs database
+DB_PATH = "jobs.db"
 
 
-def _init_db_sync():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL;")
-    cursor.execute("PRAGMA synchronous=NORMAL;")
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            page_id TEXT PRIMARY KEY,
-            data TEXT NOT NULL
+def init_db() -> None:
+    """Initializes the SQLite database with WAL and NORMAL sync."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                page_id TEXT PRIMARY KEY,
+                space_key TEXT NOT NULL,
+                status TEXT NOT NULL,
+                original_content TEXT,
+                refined_content TEXT,
+                analysis TEXT,
+                review TEXT,
+                error_message TEXT
+            )
+            """
         )
-    """)
-    conn.commit()
-    conn.close()
+        conn.commit()
 
 
-async def init_db():
-    """Initializes the SQLite database asynchronously."""
-    await asyncio.to_thread(_init_db_sync)
+def _save_job_sync(job: RefinementJob) -> None:
+    """Saves a job synchronously."""
+    with sqlite3.connect(DB_PATH) as conn:
+        analysis_json = job.analysis.model_dump_json() if job.analysis else None
+        review_json = job.review.model_dump_json() if job.review else None
+
+        conn.execute(
+            """
+            INSERT INTO jobs (page_id, space_key, status, original_content,
+                refined_content, analysis, review, error_message)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(page_id) DO UPDATE SET
+                status=excluded.status,
+                original_content=excluded.original_content,
+                refined_content=excluded.refined_content,
+                analysis=excluded.analysis,
+                review=excluded.review,
+                error_message=excluded.error_message
+            """,
+            (
+                job.page_id,
+                job.space_key,
+                job.status.value,
+                job.original_content,
+                job.refined_content,
+                analysis_json,
+                review_json,
+                job.error_message,
+            ),
+        )
+        conn.commit()
 
 
-def _save_job_sync(job_json: str, page_id: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT OR REPLACE INTO jobs (page_id, data) VALUES (?, ?)
-    """, (page_id, job_json))
-    conn.commit()
-    conn.close()
+async def save_job(job: RefinementJob) -> None:
+    """Saves a job asynchronously."""
+    await asyncio.to_thread(_save_job_sync, job)
 
 
-async def save_job(job: RefinementResult):
-    """Saves a job to the database asynchronously."""
-    job_json = job.model_dump_json()
-    await asyncio.to_thread(_save_job_sync, job_json, job.page_id)
+def _get_job_sync(page_id: str) -> Optional[RefinementJob]:
+    """Retrieves a job synchronously."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM jobs WHERE page_id = ?", (page_id,))
+        row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        # Convert back to dict and deserialize json
+        data = dict(row)
+        if data["analysis"]:
+            data["analysis"] = json.loads(data["analysis"])
+        if data["review"]:
+            data["review"] = json.loads(data["review"])
+
+        return RefinementJob(**data)
 
 
-def _get_job_sync(page_id: str) -> Optional[str]:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT data FROM jobs WHERE page_id = ?", (page_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return row[0]
-    return None
+async def get_job(page_id: str) -> Optional[RefinementJob]:
+    """Retrieves a job asynchronously."""
+    return await asyncio.to_thread(_get_job_sync, page_id)
 
 
-async def get_job(page_id: str) -> Optional[RefinementResult]:
-    """Retrieves a job from the database asynchronously."""
-    data = await asyncio.to_thread(_get_job_sync, page_id)
-    if data:
-        return RefinementResult.model_validate_json(data)
-    return None
+def _get_jobs_by_space_sync(space_key: str) -> List[RefinementJob]:
+    """Retrieves all jobs for a space synchronously."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM jobs WHERE space_key = ?", (space_key,))
+        rows = cursor.fetchall()
+
+        jobs: List[RefinementJob] = []
+        for row in rows:
+            data = dict(row)
+            if data["analysis"]:
+                data["analysis"] = json.loads(data["analysis"])
+            if data["review"]:
+                data["review"] = json.loads(data["review"])
+            jobs.append(RefinementJob(**data))
+
+        return jobs
+
+
+async def get_jobs_by_space(space_key: str) -> List[RefinementJob]:
+    """Retrieves all jobs for a space asynchronously."""
+    return await asyncio.to_thread(_get_jobs_by_space_sync, space_key)

@@ -1,6 +1,5 @@
 import os
 import logging
-import re
 from typing import Optional
 from openai import AsyncOpenAI
 
@@ -8,69 +7,48 @@ logger = logging.getLogger(__name__)
 
 _client: Optional[AsyncOpenAI] = None
 
-
 def _get_client() -> Optional[AsyncOpenAI]:
+    """Returns the OpenAI client, or None if the API key is missing."""
     global _client
     if _client is None:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            logger.warning("OPENAI_API_KEY not set in environment variables. LLM capabilities will be disabled.")
+            logger.warning("OPENAI_API_KEY is not set. LLM capabilities will be disabled.")
             return None
-        try:
-            _client = AsyncOpenAI(api_key=api_key)
-            logger.info("OpenAI client initialized successfully.")
-        except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
-            return None
+        _client = AsyncOpenAI(api_key=api_key)
     return _client
 
-
 def clean_json_response(response: str) -> str:
-    """
-    Cleans the LLM response to ensure it is valid JSON.
-    Removes Markdown code blocks (```json ... ```) using regex.
-    """
-    # Regex to find content within ```json ... ``` or just ``` ... ```
-    match = re.search(r"```(?:json)?\s*(.*?)\s*```", response, re.DOTALL)
-    if match:
-        return match.group(1).strip()
+    """Removes Markdown code block formatting from LLM outputs."""
+    response = response.strip()
+    if response.startswith("```json"):
+        response = response[7:]
+    elif response.startswith("```"):
+        response = response[3:]
+
+    if response.endswith("```"):
+        response = response[:-3]
+
     return response.strip()
 
-
-async def call_llm(
-    prompt: str,
-    system_prompt: str = "You are a helpful assistant.",
-    model: str = "gpt-4-turbo-preview",
-    json_mode: bool = False
-) -> str:
-    """
-    Calls the LLM with the given prompt.
-    """
+async def generate_response(
+    prompt: str, system_prompt: str = "You are a helpful assistant.", model: str = "gpt-4-turbo-preview"
+) -> Optional[str]:
+    """Generates a response from the LLM."""
     client = _get_client()
     if not client:
-        logger.warning("Skipping LLM call because client is not initialized.")
-        return ""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt}
-    ]
+        return None
 
     try:
-        if json_mode:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,  # type: ignore
-                response_format={"type": "json_object"}
-            )
-        else:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages  # type: ignore
-            )
-
-        content = response.choices[0].message.content or ""
-        return content
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,  # Lower temperature for more factual outputs
+        )
+        return response.choices[0].message.content
     except Exception as e:
-        logger.error(f"Error calling LLM: {e}", exc_info=True)
-        return ""
+        logger.error(f"Error calling OpenAI API: {e}")
+        return None

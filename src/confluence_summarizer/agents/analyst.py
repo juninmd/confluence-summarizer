@@ -1,74 +1,47 @@
-"""
-Analyst Agent
-=============
-The Analyst Agent is the first step in the refinement pipeline.
-It is responsible for reading the raw content extracted from Confluence and identifying issues.
-
-Responsibilities:
-- Analyze text for clarity, conciseness, and tone.
-- Check for formatting issues (headers, code blocks).
-- Identify outdated information (dates, versions).
-- output a structured list of critiques.
-
-Input:
-- Raw page content.
-- Related context (retrieved via RAG).
-
-Output:
-- A list of `Critique` objects.
-"""
-
 import json
-import logging
-from typing import List
-from ..models import Critique
-from .common import call_llm, clean_json_response
-
-logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """
-You are the Analyst Agent. Your goal is to critique technical documentation.
-Identify issues related to clarity, accuracy, formatting, and tone.
-Output a JSON object with a key "critiques" containing a list of objects.
-Each object must have: "issue_type", "description", "severity" (info, warning, critical), and "suggestion".
-"""
+from typing import Optional
+from confluence_summarizer.models import AnalysisResult
+from confluence_summarizer.agents.common import generate_response, clean_json_response
 
 
-async def analyze_content(content: str, context: List[str]) -> List[Critique]:
-    """
-    Analyzes the content and returns a list of critiques.
+async def analyze(text: str) -> Optional[AnalysisResult]:
+    """Analyzes text using the Analyst Agent."""
+    system_prompt = """
+    You are an expert Confluence Documentation Analyst Agent.
+    Your task is to analyze the raw text extracted from Confluence and identify flaws,
+    outdated information, missing formatting, or inconsistencies.
 
-    Args:
-        content: The raw text content of the page.
-        context: A list of related document snippets to help with fact-checking.
-
-    Returns:
-        List[Critique]: A list of critiques found in the content.
-    """
-    context_str = "\n---\n".join(context)
-    prompt = f"""
-    Analyze the following documentation page.
-
-    CONTEXT (Related pages):
-    {context_str}
-
-    PAGE CONTENT:
-    {content}
+    Provide your response as a JSON object matching this schema:
+    {
+      "critiques": [
+        {
+          "finding": "Specific description of the issue.",
+          "severity": "low, medium, or high",
+          "recommendation": "How to fix the issue."
+        }
+      ],
+      "overall_quality": "Overall assessment of the text quality."
+    }
     """
 
-    response = await call_llm(prompt, system_prompt=SYSTEM_PROMPT, json_mode=True)
-    if not response:
-        raise RuntimeError("Analyst Agent failed to generate a response (empty output).")
+    prompt = f"Analyze the following Confluence page content:\n\n{text}"
+
+    response_text = await generate_response(prompt, system_prompt)
+
+    if not response_text:
+        return None
 
     try:
-        cleaned_response = clean_json_response(response)
-        data = json.loads(cleaned_response)
-        critiques_data = data.get("critiques", [])
-        # Normalize severity to lowercase to ensure Pydantic validation
-        for c in critiques_data:
-            if "severity" in c and isinstance(c["severity"], str):
-                c["severity"] = c["severity"].lower()
-        return [Critique(**c) for c in critiques_data]
-    except Exception as e:
-        logger.error(f"Error parsing analyst response: {e}\nResponse was: {response}", exc_info=True)
-        raise RuntimeError(f"Analyst Agent failed to parse response: {e}")
+        cleaned_json = clean_json_response(response_text)
+        data = json.loads(cleaned_json)
+
+        # Normalize severity to lowercase as required by the model
+        for critique in data.get("critiques", []):
+            if "severity" in critique:
+                critique["severity"] = str(critique["severity"]).lower()
+
+        return AnalysisResult(**data)
+    except json.JSONDecodeError:
+        return None
+    except Exception:
+        return None
