@@ -1,76 +1,52 @@
-import os
 import logging
 import re
 from typing import Optional
 from openai import AsyncOpenAI
+from src.confluence_summarizer.config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: Optional[AsyncOpenAI] = None
+_openai_client: Optional[AsyncOpenAI] = None
 
 
 def _get_client() -> Optional[AsyncOpenAI]:
-    global _client
-    if _client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            logger.warning("OPENAI_API_KEY not set in environment variables. LLM capabilities will be disabled.")
+    global _openai_client
+    if _openai_client is None:
+        if not settings.OPENAI_API_KEY:
+            logger.warning("OPENAI_API_KEY not set. LLM capabilities will be disabled.")
             return None
-        try:
-            _client = AsyncOpenAI(api_key=api_key)
-            logger.info("OpenAI client initialized successfully.")
-        except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
-            return None
-    return _client
+        _openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    return _openai_client
 
 
-def clean_json_response(response: str) -> str:
-    """
-    Cleans the LLM response to ensure it is valid JSON.
-    Removes Markdown code blocks (```json ... ```) using regex.
-    """
-    # Regex to find content within ```json ... ``` or just ``` ... ```
-    match = re.search(r"```(?:json)?\s*(.*?)\s*```", response, re.DOTALL)
+async def generate_response(
+    prompt: str,
+    system_prompt: str,
+    model: str = "gpt-4-turbo-preview",
+    temperature: float = 0.7,
+) -> str:
+    """Helper function to generate a response from OpenAI's Chat API."""
+    client = _get_client()
+    if client is None:
+        logger.warning("Returning mock response due to missing OpenAI client.")
+        return '{"critiques": [{"description": "Mock critique due to missing API key.", "severity": "low", "suggestion": "Fix it."}]}'
+
+    response = await client.chat.completions.create(
+        model=model,
+        temperature=temperature,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    content = response.choices[0].message.content
+    return content if content else ""
+
+
+def clean_json_response(raw_text: str) -> str:
+    """Clean markdown code blocks from an LLM JSON response."""
+    match = re.search(r"```json\s*(.*?)\s*```", raw_text, re.DOTALL)
     if match:
         return match.group(1).strip()
-    return response.strip()
-
-
-async def call_llm(
-    prompt: str,
-    system_prompt: str = "You are a helpful assistant.",
-    model: str = "gpt-4-turbo-preview",
-    json_mode: bool = False
-) -> str:
-    """
-    Calls the LLM with the given prompt.
-    """
-    client = _get_client()
-    if not client:
-        logger.warning("Skipping LLM call because client is not initialized.")
-        return ""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt}
-    ]
-
-    try:
-        if json_mode:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,  # type: ignore
-                response_format={"type": "json_object"}
-            )
-        else:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages  # type: ignore
-            )
-
-        content = response.choices[0].message.content or ""
-        return content
-    except Exception as e:
-        logger.error(f"Error calling LLM: {e}", exc_info=True)
-        return ""
+    return raw_text.strip()
