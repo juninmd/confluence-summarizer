@@ -15,7 +15,8 @@ class ConfluencePage(BaseModel):
     title: str
     space_key: str
     body: str
-    version: int
+    version: int = 1
+    url: str = ""
 
 
 class CritiqueSeverity(str, Enum):

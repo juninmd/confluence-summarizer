@@ -83,8 +83,17 @@ async def get_page(page_id: str) -> ConfluencePage:
     if "space" in data and "key" in data["space"]:
         space_key = data["space"]["key"]
 
+    version = data.get("version", {}).get("number", 1)
+    webui = data.get("_links", {}).get("webui", "")
+    page_url = f"{settings.CONFLUENCE_URL}{webui}" if webui else ""
+
     return ConfluencePage(
-        id=str(data["id"]), title=data["title"], space_key=space_key, body=body, version=data["version"]["number"]
+        id=str(data["id"]),
+        title=data["title"],
+        space_key=space_key,
+        body=body,
+        version=version,
+        url=page_url,
     )
 
 
@@ -99,7 +108,7 @@ async def get_pages_from_space(
     client = _get_client()
     pages: List[ConfluencePage] = []
 
-    url = f"/wiki/rest/api/content?spaceKey={space_key}&expand=body.storage&limit={page_size}"
+    url = f"/wiki/rest/api/content?spaceKey={space_key}&expand=body.storage,version&limit={page_size}"
 
     while url:
         response = await client.get(url)
@@ -111,12 +120,18 @@ async def get_pages_from_space(
             if "body" in item and "storage" in item["body"]:
                 body = clean_html(item["body"]["storage"].get("value", ""))
 
+            version = item.get("version", {}).get("number", 1)
+            webui = item.get("_links", {}).get("webui", "")
+            page_url = f"{settings.CONFLUENCE_URL}{webui}" if webui else ""
+
             pages.append(
                 ConfluencePage(
                     id=str(item["id"]),
                     title=item["title"],
                     space_key=space_key,
                     body=body,
+                    version=version,
+                    url=page_url,
                 )
             )
 

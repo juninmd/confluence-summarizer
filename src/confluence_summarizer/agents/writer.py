@@ -33,6 +33,4 @@ async def rewrite_content(
     )
 
     response = await generate_response(prompt=prompt, system_prompt=system_prompt)
-    if not response:
-        raise ValueError("Writer agent returned an empty response.")
     return response.strip()
