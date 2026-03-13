@@ -84,7 +84,7 @@ async def get_page(page_id: str) -> ConfluencePage:
         space_key = data["space"]["key"]
 
     return ConfluencePage(
-        id=str(data["id"]), title=data["title"], space_key=space_key, body=body
+        id=str(data["id"]), title=data["title"], space_key=space_key, body=body, version=data["version"]["number"]
     )
 
 
