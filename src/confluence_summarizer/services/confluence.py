@@ -88,12 +88,7 @@ async def get_page(page_id: str) -> ConfluencePage:
     page_url = f"{settings.CONFLUENCE_URL}{webui}" if webui else ""
 
     return ConfluencePage(
-        id=str(data["id"]),
-        title=data["title"],
-        space_key=space_key,
-        body=body,
-        version=version,
-        url=page_url,
+        id=str(data["id"]), title=data["title"], space_key=space_key, body=body, version=data["version"]["number"]
     )
 
 
