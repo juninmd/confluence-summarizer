@@ -214,7 +214,7 @@ async def publish_page(job_id: str) -> Dict[str, Any]:
             page_id=job.page_id,
             title=current_page.title,
             body=job.refined_text,
-            version_number=2,  # A hardcoded bump for demonstration, ideal logic gets current version + 1
+            version_number=current_page.version + 1,  # A hardcoded bump for demonstration, ideal logic gets current version + 1
         )
         return {"message": "Page published successfully", "page_id": job.page_id}
     except Exception as e:
