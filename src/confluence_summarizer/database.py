@@ -1,62 +1,81 @@
 import sqlite3
-import os
 import asyncio
 from typing import Optional
-from .models import RefinementResult
+from src.confluence_summarizer.models.domain import RefinementJob, RefinementStatus
+from src.confluence_summarizer.config import settings
+import logging
 
-DB_PATH = os.getenv("DB_PATH", "jobs.db")
+logger = logging.getLogger(__name__)
 
 
-def _init_db_sync():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL;")
-    cursor.execute("PRAGMA synchronous=NORMAL;")
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            page_id TEXT PRIMARY KEY,
-            data TEXT NOT NULL
+def init_db() -> None:
+    """Initialize the SQLite database schema."""
+    with sqlite3.connect(settings.DB_PATH) as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                page_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error TEXT,
+                original_text TEXT,
+                refined_text TEXT
+            )
+            """)
+        conn.commit()
+
+
+def save_job_sync(job: RefinementJob) -> None:
+    """Save a job to the database synchronously."""
+    with sqlite3.connect(settings.DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO jobs (id, page_id, status, error, original_text, refined_text)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                status=excluded.status,
+                error=excluded.error,
+                original_text=excluded.original_text,
+                refined_text=excluded.refined_text
+            """,
+            (
+                job.id,
+                job.page_id,
+                job.status.value,
+                job.error,
+                job.original_text,
+                job.refined_text,
+            ),
         )
-    """)
-    conn.commit()
-    conn.close()
+        conn.commit()
 
 
-async def init_db():
-    """Initializes the SQLite database asynchronously."""
-    await asyncio.to_thread(_init_db_sync)
+def get_job_sync(job_id: str) -> Optional[RefinementJob]:
+    """Retrieve a job from the database synchronously."""
+    with sqlite3.connect(settings.DB_PATH) as conn:
+        cursor = conn.execute(
+            "SELECT id, page_id, status, error, original_text, refined_text FROM jobs WHERE id = ?",
+            (job_id,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return RefinementJob(
+                id=row[0],
+                page_id=row[1],
+                status=RefinementStatus(row[2]),
+                error=row[3],
+                original_text=row[4],
+                refined_text=row[5],
+            )
+        return None
 
 
-def _save_job_sync(job_json: str, page_id: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT OR REPLACE INTO jobs (page_id, data) VALUES (?, ?)
-    """, (page_id, job_json))
-    conn.commit()
-    conn.close()
+async def save_job(job: RefinementJob) -> None:
+    """Save a job asynchronously using asyncio.to_thread."""
+    await asyncio.to_thread(save_job_sync, job)
 
 
-async def save_job(job: RefinementResult):
-    """Saves a job to the database asynchronously."""
-    job_json = job.model_dump_json()
-    await asyncio.to_thread(_save_job_sync, job_json, job.page_id)
-
-
-def _get_job_sync(page_id: str) -> Optional[str]:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT data FROM jobs WHERE page_id = ?", (page_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return row[0]
-    return None
-
-
-async def get_job(page_id: str) -> Optional[RefinementResult]:
-    """Retrieves a job from the database asynchronously."""
-    data = await asyncio.to_thread(_get_job_sync, page_id)
-    if data:
-        return RefinementResult.model_validate_json(data)
-    return None
+async def get_job(job_id: str) -> Optional[RefinementJob]:
+    """Get a job asynchronously using asyncio.to_thread."""
+    return await asyncio.to_thread(get_job_sync, job_id)

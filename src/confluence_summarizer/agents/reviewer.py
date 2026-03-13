@@ -1,79 +1,58 @@
-"""
-Reviewer Agent
-==============
-The Reviewer Agent is the final step in the refinement pipeline.
-It acts as a gatekeeper before content is saved or published.
-
-Responsibilities:
-- Validate that the rewritten content is accurate and clear.
-- Ensure that the critiques from the Analyst Agent were addressed.
-- Check for hallucinations or new errors introduced by the Writer.
-- Provide a final status (COMPLETED/REJECTED) and comments.
-
-Input:
-- Original content.
-- Rewritten content.
-- Summary of critiques.
-
-Output:
-- A decision status and comments.
-"""
-
 import json
-import logging
-from typing import Dict, Any
-from ..models import RefinementStatus
-from .common import call_llm, clean_json_response
-
-logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """
-You are the Reviewer Agent. Validate if the rewritten content is acceptable.
-Check if critiques were addressed and if no new errors were introduced.
-Output a JSON object with "status" (must be one of: "approved", "rejected") and "comments" (string).
-"""
+from src.confluence_summarizer.agents.common import (
+    generate_response,
+    clean_json_response,
+)
+from src.confluence_summarizer.models.domain import RefinementStatus, AnalysisResult
+from pydantic import BaseModel, Field
 
 
-async def review_content(original: str, rewritten: str, critiques_summary: str) -> Dict[str, Any]:
-    """
-    Reviews the rewritten content against the original and the critiques.
+class ReviewResult(BaseModel):
+    status: RefinementStatus = Field(
+        description="Review decision (accepted, pending, failed)."
+    )
+    feedback: str = Field(description="Optional feedback.")
 
-    Args:
-        original: The original content.
-        rewritten: The rewritten content.
-        critiques_summary: A summary of the critiques that were supposed to be addressed.
 
-    Returns:
-        Dict[str, Any]: A dictionary containing "status" (RefinementStatus) and "comments" (str).
-    """
-    prompt = f"""
-    Original Content:
-    {original}
+async def review_content(
+    original_text: str, rewritten_text: str, critiques: AnalysisResult
+) -> ReviewResult:
+    """Review the rewritten content against the original and critiques."""
 
-    Critiques that were raised:
-    {critiques_summary}
+    system_prompt = (
+        "You are a Reviewer Agent. Your task is to evaluate the rewritten Confluence documentation "
+        "against the original text and the Analyst's critiques. Ensure the rewritten text is coherent, "
+        "factually correct, and has properly addressed the critiques. "
+        "Respond in JSON format with two keys: 'status' (can be 'completed', 'accepted', 'approved', "
+        "'failed', 'pending') and 'feedback' (string detailing your decision)."
+    )
 
-    Rewritten Content:
-    {rewritten}
+    critiques_str = "\n".join(
+        [f"- {c.severity.upper()}: {c.description}" for c in critiques.critiques]
+    )
 
-    Provide your review.
-    """
+    prompt = (
+        f"Original Text:\n{original_text}\n\n"
+        f"Rewritten Text:\n{rewritten_text}\n\n"
+        f"Analyst Critiques:\n{critiques_str}\n\n"
+        "Please provide your review in JSON format."
+    )
 
-    response = await call_llm(prompt, system_prompt=SYSTEM_PROMPT, json_mode=True)
-    if not response:
-        return {"status": RefinementStatus.FAILED, "comments": "No response from LLM"}
+    response = await generate_response(prompt=prompt, system_prompt=system_prompt)
+    cleaned_json = clean_json_response(response)
 
     try:
-        cleaned_response = clean_json_response(response)
-        data = json.loads(cleaned_response)
-        # Normalize status
-        status_str = data.get("status", "").lower()
-        if status_str in ["completed", "approved", "accepted"]:
+        data = json.loads(cleaned_json)
+        status_str = data.get("status", "pending").lower()
+        if status_str in ["accepted", "approved", "completed"]:
             status = RefinementStatus.COMPLETED
+        elif status_str == "failed":
+            status = RefinementStatus.FAILED
         else:
-            status = RefinementStatus.REJECTED
+            status = RefinementStatus.PENDING
 
-        return {"status": status, "comments": data.get("comments", "")}
+        return ReviewResult(status=status, feedback=data.get("feedback", ""))
     except Exception as e:
-        logger.error(f"Error parsing reviewer response: {e}\nResponse was: {response}", exc_info=True)
-        return {"status": RefinementStatus.FAILED, "comments": "Failed to parse reviewer output"}
+        return ReviewResult(
+            status=RefinementStatus.FAILED, feedback=f"Failed to parse review: {e}"
+        )

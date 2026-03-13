@@ -1,12 +1,12 @@
+.venv
 __pycache__/
 *.pyc
-.venv/
-.env
-chroma_db/
-.pytest_cache/
-.mypy_cache/
-jobs.db
-*.db
+.pytest_cache
 .coverage
-htmlcov/
-test_chroma_db/
+.ruff_cache/
+coverage.xml
+
+# Databases
+*.db
+*.db-*
+chroma_db/
