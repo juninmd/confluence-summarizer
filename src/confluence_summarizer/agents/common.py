@@ -29,7 +29,10 @@ async def generate_response(
     client = _get_client()
     if client is None:
         logger.warning("Returning mock response due to missing OpenAI client.")
-        return '{"critiques": [{"description": "Mock critique due to missing API key.", "severity": "low", "suggestion": "Fix it."}]}'
+        return (
+            '{"critiques": [{"description": "Mock critique due to missing API key.", '
+            '"severity": "low", "suggestion": "Fix it."}]}'
+        )
 
     response = await client.chat.completions.create(
         model=model,

@@ -14,7 +14,8 @@ async def analyze_content(original_text: str, context: List[str]) -> AnalysisRes
         "You are an Analyst Agent. Your task is to review the provided Confluence documentation text "
         "and compare it against the provided context. Identify any flaws, outdated information, formatting issues, "
         "or inconsistencies. Provide a list of critiques in a structured JSON format matching this schema:\n"
-        '{"critiques": [{"description": "Issue description", "severity": "low|medium|high", "suggestion": "How to fix"}]}'
+        '{"critiques": [{"description": "Issue description", "severity": "low|medium|high", '
+        '"suggestion": "How to fix"}]}'
     )
 
     context_str = "\n".join(

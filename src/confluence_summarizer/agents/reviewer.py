@@ -23,8 +23,8 @@ async def review_content(
         "You are a Reviewer Agent. Your task is to evaluate the rewritten Confluence documentation "
         "against the original text and the Analyst's critiques. Ensure the rewritten text is coherent, "
         "factually correct, and has properly addressed the critiques. "
-        "Respond in JSON format with two keys: 'status' (can be 'completed', 'accepted', 'approved', 'failed', 'pending') "
-        "and 'feedback' (string detailing your decision)."
+        "Respond in JSON format with two keys: 'status' (can be 'completed', 'accepted', 'approved', "
+        "'failed', 'pending') and 'feedback' (string detailing your decision)."
     )
 
     critiques_str = "\n".join(
