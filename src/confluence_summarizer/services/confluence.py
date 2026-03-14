@@ -1,5 +1,6 @@
 import os
 import logging
+import urllib.parse
 from typing import Optional, List, Dict, Any
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -52,7 +53,8 @@ async def get_page_content(page_id: str) -> str:
         logger.error("CONFLUENCE_URL is not set.")
         raise ValueError("CONFLUENCE_URL is required.")
 
-    url = f"{base_url}/wiki/api/v2/pages/{page_id}?body-format=storage"
+    safe_page_id = urllib.parse.quote(page_id, safe="")
+    url = f"{base_url}/wiki/api/v2/pages/{safe_page_id}?body-format=storage"
     auth = _get_auth()
 
     client = _get_client_instance()
@@ -78,7 +80,8 @@ async def get_space_pages(space_key: str) -> List[Dict[str, Any]]:
 
     all_pages: List[Dict[str, Any]] = []
     # Paginate in chunks of 50
-    url: Optional[str] = f"{base_url}/wiki/api/v2/spaces/{space_key}/pages?limit=50"
+    safe_space_key = urllib.parse.quote(space_key, safe="")
+    url: Optional[str] = f"{base_url}/wiki/api/v2/spaces/{safe_space_key}/pages?limit=50"
     auth = _get_auth()
     client = _get_client_instance()
 

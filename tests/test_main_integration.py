@@ -28,7 +28,7 @@ def mock_chroma():
 
 @pytest.fixture
 def mock_env():
-    with patch.dict(os.environ, {"CONFLUENCE_URL": "http://test", "CONFLUENCE_USERNAME": "u", "CONFLUENCE_API_TOKEN": "t", "OPENAI_API_KEY": "sk-123", "CHROMA_DB_PATH": "test_db"}):
+    with patch.dict(os.environ, {"CONFLUENCE_URL": "https://test.local", "CONFLUENCE_USERNAME": "u", "CONFLUENCE_API_TOKEN": "t", "OPENAI_API_KEY": "dummy-openai-key", "CHROMA_DB_PATH": "test_db"}):
         yield
 
 @pytest.mark.asyncio

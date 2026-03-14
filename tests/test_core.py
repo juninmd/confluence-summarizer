@@ -11,19 +11,19 @@ from confluence_summarizer.services.rag import chunk_text
 
 @pytest.fixture
 def mock_env():
-    with patch.dict(os.environ, {"CONFLUENCE_URL": "http://test", "CONFLUENCE_USERNAME": "u", "CONFLUENCE_API_TOKEN": "t", "OPENAI_API_KEY": "sk-123", "CHROMA_DB_PATH": "test_db"}):
+    with patch.dict(os.environ, {"CONFLUENCE_URL": "https://test.local", "CONFLUENCE_USERNAME": "u", "CONFLUENCE_API_TOKEN": "t", "OPENAI_API_KEY": "dummy-openai-key", "CHROMA_DB_PATH": "test_db"}):
         yield
 
 @pytest.fixture
 def mock_no_auth():
-    with patch.dict(os.environ, {"CONFLUENCE_URL": "http://test", "OPENAI_API_KEY": "sk-123", "CHROMA_DB_PATH": "test_db"}):
+    with patch.dict(os.environ, {"CONFLUENCE_URL": "https://test.local", "OPENAI_API_KEY": "dummy-openai-key", "CHROMA_DB_PATH": "test_db"}):
         yield
 
 @pytest.mark.asyncio
 async def test_confluence_get_page_content(mock_env, httpx_mock):
     conf_service.init_client()
     httpx_mock.add_response(
-        url="http://test/wiki/api/v2/pages/123?body-format=storage",
+        url="https://test.local/wiki/api/v2/pages/123?body-format=storage",
         json={"body": {"storage": {"value": "Test Content"}}}
     )
     content = await conf_service.get_page_content("123")
@@ -34,14 +34,14 @@ async def test_confluence_get_page_content(mock_env, httpx_mock):
 async def test_confluence_get_space_pages(mock_env, httpx_mock):
     conf_service.init_client()
     httpx_mock.add_response(
-        url="http://test/wiki/api/v2/spaces/TEST/pages?limit=50",
+        url="https://test.local/wiki/api/v2/spaces/TEST/pages?limit=50",
         json={
             "results": [{"id": "1"}, {"id": "2"}],
             "_links": {"next": "/wiki/api/v2/spaces/TEST/pages?cursor=abcd"}
         }
     )
     httpx_mock.add_response(
-        url="http://test/wiki/api/v2/spaces/TEST/pages?cursor=abcd",
+        url="https://test.local/wiki/api/v2/spaces/TEST/pages?cursor=abcd",
         json={
             "results": [{"id": "3"}],
             "_links": {}
