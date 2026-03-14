@@ -2,16 +2,23 @@ import os
 import asyncio
 import logging
 import chromadb
-from typing import List
+from typing import List, Any
 
 logger = logging.getLogger(__name__)
 
 # Path to local ChromaDB
 DB_PATH = os.getenv("CHROMA_DB_PATH", "chroma_db")
+_chroma_client: Any = None
+
+def _get_client() -> Any:
+    global _chroma_client
+    if _chroma_client is None:
+        _chroma_client = chromadb.PersistentClient(path=DB_PATH)
+    return _chroma_client
 
 def _get_collection() -> chromadb.Collection:
     """Returns the ChromaDB collection for Confluence documents."""
-    client = chromadb.PersistentClient(path=DB_PATH)
+    client = _get_client()
     return client.get_or_create_collection("confluence_docs")
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
