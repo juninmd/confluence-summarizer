@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 refinement_semaphore = asyncio.Semaphore(settings.REFINEMENT_CONCURRENCY)
 ingestion_semaphore = asyncio.Semaphore(settings.INGESTION_CONCURRENCY)
 
+# Store background tasks to prevent garbage collection
+_background_tasks: set[asyncio.Task[Any]] = set()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -151,7 +154,9 @@ async def process_space_refinement(space_key: str):
                         j.error = str(e)
                         await save_job(j)
 
-            asyncio.create_task(_process_with_page(job, page))
+            task = asyncio.create_task(_process_with_page(job, page))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
 
     except Exception:
         logger.exception(f"Error processing space {space_key}")
