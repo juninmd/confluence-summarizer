@@ -56,6 +56,10 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[st
         raise ValueError("overlap must be non-negative")
     if overlap >= chunk_size:
         raise ValueError("overlap must be less than chunk_size")
+    if overlap < 0:
+        raise ValueError("overlap must be non-negative")
+    if overlap >= chunk_size:
+        raise ValueError("overlap must be less than chunk_size")
 
     chunks: List[str] = []
     start = 0
