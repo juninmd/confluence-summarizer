@@ -211,3 +211,6 @@ def test_get_client_missing_key():
     finally:
         # Restore original client
         common._client = original_client
+    finally:
+        # Restore original client
+        common._client = original_client
