@@ -67,4 +67,4 @@ async def analyze_content(content: str, context: List[str]) -> List[Critique]:
         return [Critique(**c) for c in critiques_data]
     except Exception as e:
         logger.error(f"Error parsing analyst response: {e}\nResponse was: {response}", exc_info=True)
-        raise RuntimeError(f"Analyst Agent failed to parse response: {e}")
+        raise RuntimeError(f"Analyst Agent failed to parse response: {e}") from e
