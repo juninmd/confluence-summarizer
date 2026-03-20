@@ -16,6 +16,7 @@ class ConfluencePage(BaseModel):
     space_key: str
     body: str
     version: int
+    version: int
     version: int = 1
     url: str = ""
 
