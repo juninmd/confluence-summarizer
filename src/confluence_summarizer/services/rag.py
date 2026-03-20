@@ -102,7 +102,7 @@ def _ingest_page(page: ConfluencePage) -> None:
         collection.delete(where=where_clause)
     except Exception as e:
         # Might fail if collection empty or other issues, but usually fine.
-        logger.warning(f"Failed to delete existing chunks for page {page.id}: {e}")
+        logger.warning(f"Failed to delete existing chunks for page {page.id}: {e}", exc_info=True)
 
     chunks = chunk_text(page.body)
 
