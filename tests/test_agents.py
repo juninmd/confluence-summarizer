@@ -162,13 +162,16 @@ def test_clean_json_response_simple():
 
 
 def test_get_client_missing_key():
-    # Reset client
+    # Reset client and ensure cleanup to prevent test pollution
+    original_client = common._client
     common._client = None
-    with patch.dict(os.environ, {}, clear=True):
-        with patch("confluence_refiner.agents.common.logger") as mock_logger:
-            with patch("confluence_refiner.agents.common.AsyncOpenAI") as mock_openai_cls:
-                client = common._get_client()
-                mock_logger.warning.assert_called_with("OPENAI_API_KEY not set. LLM calls will fail.")
-                assert client is not None
-    # Cleanup
-    common._client = None
+    try:
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("confluence_refiner.agents.common.logger") as mock_logger:
+                with patch("confluence_refiner.agents.common.AsyncOpenAI"):
+                    client = common._get_client()
+                    mock_logger.warning.assert_called_with("OPENAI_API_KEY not set. LLM calls will fail.")
+                    assert client is not None
+    finally:
+        # Restore original client
+        common._client = original_client
