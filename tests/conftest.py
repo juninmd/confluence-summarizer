@@ -1,21 +1,17 @@
+import os
 
 import pytest
-from src.confluence_summarizer.config import settings
 
-@pytest.fixture(autouse=True)
-def dummy_env_vars():
-    """Ensure tests run with secure dummy values instead of hardcoded secrets, bypassing SonarCloud static checks."""
-    settings.confluence_url = "https://test.local"
-    settings.confluence_username = "dummy-user"
-    settings.confluence_api_token = "dummy-token"
-    settings.openai_api_key = "dummy-openai-key"
-    settings.chroma_db_path = "chroma_db_test"
-    settings.db_path = "jobs_test.db"
+# Set environment variables before any tests are collected/run
+os.environ["OPENAI_API_KEY"] = "sk-test-key"
+os.environ["CONFLUENCE_URL"] = "https://test.atlassian.net/wiki"
+os.environ["CONFLUENCE_USERNAME"] = "testuser"
+os.environ["CONFLUENCE_API_TOKEN"] = "testtoken"
+os.environ["CHROMA_DB_PATH"] = "./test_chroma_db"
+os.environ["DB_PATH"] = ":memory:"
 
-@pytest.fixture(autouse=True)
-def mock_httpx_client(mocker):
-    """Mocks the shared HTTP client from the confluence service to isolate tests."""
-    mock_client = mocker.AsyncMock()
-    # Replace global _client with our mock instance
-    mocker.patch("src.confluence_summarizer.services.confluence._client", mock_client)
-    yield mock_client
+
+@pytest.fixture(scope="session", autouse=True)
+def set_env_fixture():
+    # Double check/ensure they are set if overwritten
+    os.environ["OPENAI_API_KEY"] = "sk-test-key"

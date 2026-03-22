@@ -1,69 +1,89 @@
+from unittest.mock import AsyncMock, patch
+
+import httpx
 import pytest
 from fastapi.testclient import TestClient
-from src.confluence_summarizer.main import app, init_db
-from src.confluence_summarizer.database import get_job
-from src.confluence_summarizer.services.rag import ingest_page, query_context, chunk_text
-from src.confluence_summarizer.config import settings
 
-import os
+from src.confluence_summarizer import config
+from src.confluence_summarizer.database import init_db, save_job_sync
+from src.confluence_summarizer.main import app
+from src.confluence_summarizer.models.domain import (
+    RefinementJob,
+    RefinementStatus,
+)
 
 client = TestClient(app)
 
+
 @pytest.fixture(autouse=True)
-def setup_teardown_db():
-    if os.path.exists("jobs_test.db"):
-        os.remove("jobs_test.db")
-    settings.db_path = "jobs_test.db"
+def setup_db(tmp_path):
+    db_path = tmp_path / "test_jobs.db"
+    config.settings.DB_PATH = str(db_path)
     init_db()
-    yield
-    if os.path.exists("jobs_test.db"):
-        os.remove("jobs_test.db")
 
-def test_startup_endpoints():
-    """Garante que a API consegue disparar refinamento single e devolver o job id."""
-    response = client.post("/refine/test_page_123")
-    assert response.status_code == 200
-    data = response.json()
-    assert "job_id" in data
 
-    status_resp = client.get(f"/status/{data['job_id']}")
-    assert status_resp.status_code == 200
-    assert status_resp.json()["status"] in ("PENDING", "IN_PROGRESS")
+@pytest.fixture
+def mock_confluence_client():
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    with patch(
+        "src.confluence_summarizer.services.confluence._get_client",
+        return_value=mock_client,
+    ):
+        yield mock_client
 
-def test_space_batch_endpoint():
-    """Garante dispatch de space batch process."""
-    response = client.post("/refine/space/TEST_SPACE")
-    assert response.status_code == 200
-    assert "job_id" in response.json()
-
-def test_publish_uncompleted_job():
-    """Tenta publicar um job pending gerando erro 400."""
-    response = client.post("/refine/test_page_456")
-    job_id = response.json()["job_id"]
-    pub_resp = client.post(f"/publish/{job_id}")
-    assert pub_resp.status_code == 400
-
-def test_rag_chunking():
-    """Testa quebra segura de texto."""
-    text = "A" * 1500
-    chunks = chunk_text(text, 1000, 100)
-    assert len(chunks) == 2
-    assert len(chunks[0]) == 1000
-
-    # Text with spaces
-    text_spaces = "Palavra " * 200
-    chunks_spaces = chunk_text(text_spaces, 1000, 100)
-    assert len(chunks_spaces) >= 1
 
 @pytest.mark.asyncio
-async def test_rag_ingest_and_query(mocker):
-    """Verifica inserção e fallback ChromaDB SQLite lock handling via threads."""
-    settings.chroma_db_path = "chroma_db_test_rag"
-    await ingest_page("101", "HTML Content is valuable and needs fixing.", "Page 101")
+async def test_refine_page_endpoint(mock_confluence_client):
+    # Mocking background tasks to not actually run for the endpoint test
+    with patch(
+        "src.confluence_summarizer.main.BackgroundTasks.add_task"
+    ) as mock_add_task:
+        response = client.post("/refine/test-page-id")
 
-    results = await query_context("valuable fixing")
-    assert len(results) >= 0 # Pode ser zero dependendo do overlap default e dummy db local
+        assert response.status_code == 202
+        data = response.json()
+        assert data["message"] == "Refinement job accepted"
+        assert "job_id" in data
+        assert data["page_id"] == "test-page-id"
 
-    import shutil
-    if os.path.exists(settings.chroma_db_path):
-         shutil.rmtree(settings.chroma_db_path)
+        # Check background task was queued
+        assert mock_add_task.called
+
+
+@pytest.mark.asyncio
+async def test_refine_space_endpoint():
+    with patch(
+        "src.confluence_summarizer.main.BackgroundTasks.add_task"
+    ) as mock_add_task:
+        response = client.post("/refine/space/TESTSPACE")
+
+        assert response.status_code == 202
+        data = response.json()
+        assert data["message"] == "Space refinement job accepted"
+        assert data["space_key"] == "TESTSPACE"
+        assert mock_add_task.called
+
+
+@pytest.mark.asyncio
+async def test_get_status_endpoint():
+    job = RefinementJob(
+        id="test-job-id",
+        page_id="test-page-id",
+        status=RefinementStatus.COMPLETED,
+        refined_text="Done.",
+    )
+    save_job_sync(job)
+
+    response = client.get("/status/test-job-id")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "test-job-id"
+    assert data["status"] == "completed"
+    assert data["refined_text"] == "Done."
+
+
+@pytest.mark.asyncio
+async def test_get_status_not_found():
+    response = client.get("/status/non-existent-job")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Job not found"}

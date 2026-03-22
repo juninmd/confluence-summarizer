@@ -1,24 +1,12 @@
-# Build artifacts
-build/
-dist/
-*.egg-info/
+.venv
 __pycache__/
 *.pyc
-*.pyo
+.pytest_cache
+.coverage
+.ruff_cache/
+coverage.xml
 
 # Databases
 *.db
-*.db-shm
-*.db-wal
+*.db-*
 chroma_db/
-
-# Virtual environments
-.venv/
-venv/
-env/
-.env
-
-# Tests and Coverage
-.pytest_cache/
-.coverage
-htmlcov/
