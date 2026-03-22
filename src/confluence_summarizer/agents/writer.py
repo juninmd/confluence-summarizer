@@ -1,4 +1,5 @@
 from typing import List
+
 from src.confluence_summarizer.agents.common import generate_response
 from src.confluence_summarizer.models.domain import AnalysisResult
 
@@ -22,7 +23,7 @@ async def rewrite_content(
     )
 
     context_str = "\n".join(
-        [f"Context Block {i+1}: {ctx}" for i, ctx in enumerate(context)]
+        [f"Context Block {i + 1}: {ctx}" for i, ctx in enumerate(context)]
     )
 
     prompt = (

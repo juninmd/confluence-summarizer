@@ -1,10 +1,12 @@
 import json
-from src.confluence_summarizer.agents.common import (
-    generate_response,
-    clean_json_response,
-)
-from src.confluence_summarizer.models.domain import RefinementStatus, AnalysisResult
+
 from pydantic import BaseModel, Field
+
+from src.confluence_summarizer.agents.common import (
+    clean_json_response,
+    generate_response,
+)
+from src.confluence_summarizer.models.domain import AnalysisResult, RefinementStatus
 
 
 class ReviewResult(BaseModel):

@@ -1,9 +1,10 @@
-import sqlite3
 import asyncio
-from typing import Optional
-from src.confluence_summarizer.models.domain import RefinementJob, RefinementStatus
-from src.confluence_summarizer.config import settings
 import logging
+import sqlite3
+from typing import Optional
+
+from src.confluence_summarizer.config import settings
+from src.confluence_summarizer.models.domain import RefinementJob, RefinementStatus
 
 logger = logging.getLogger(__name__)
 

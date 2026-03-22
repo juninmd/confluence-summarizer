@@ -1,10 +1,12 @@
+import asyncio
+import logging
+from typing import Any, List
+
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+
 from src.confluence_summarizer.config import settings
 from src.confluence_summarizer.models.domain import ConfluencePage
-import logging
-from typing import List, Any
-import asyncio
 
 logger = logging.getLogger(__name__)
 

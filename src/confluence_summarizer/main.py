@@ -1,23 +1,25 @@
-import logging
 import asyncio
+import logging
 import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, BackgroundTasks, HTTPException, status
+
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, FastAPI, HTTPException, status
+
 from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.database import init_db, save_job, get_job
+from src.confluence_summarizer.database import get_job, init_db, save_job
 from src.confluence_summarizer.models.domain import (
+    ConfluencePage,
     RefinementJob,
     RefinementStatus,
-    ConfluencePage,
 )
 from src.confluence_summarizer.services import confluence, rag
-from src.confluence_summarizer.agents import analyst, writer, reviewer
-from typing import Dict, Any
-
-# Load environment variables explicitly for local development
-from dotenv import load_dotenv
 
 load_dotenv()
+
+from typing import Any, Dict  # noqa: E402
+
+from src.confluence_summarizer.agents import analyst, reviewer, writer  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -130,6 +132,23 @@ async def process_space_refinement(space_key: str):
         logger.info(f"Completed ingestion for space {space_key}")
 
         # Now trigger refinement for each page, passing the page object directly to avoid re-fetching
+
+        # Create a separate task for each refinement job without blocking the space task loop
+        # Pass the page object so _perform_refinement can use it directly
+        async def _process_with_page(j: RefinementJob, p: ConfluencePage):
+            async with refinement_semaphore:
+                try:
+                    logger.info(
+                        f"Starting background processing for job {j.id} (Page: {j.page_id})"
+                    )
+                    await _perform_refinement(j, p)
+                except Exception as e:
+                    logger.exception(f"Failed to start refinement for job {j.id}")
+                    # Fix the loop variable capture issue
+                    j.status = RefinementStatus.FAILED
+                    j.error = str(e)
+                    await save_job(j)
+
         for page in pages:
             job = RefinementJob(
                 id=str(uuid.uuid4()),
@@ -138,22 +157,6 @@ async def process_space_refinement(space_key: str):
                 original_text=page.body,
             )
             await save_job(job)
-
-            # Create a separate task for each refinement job without blocking the space task loop
-            # Pass the page object so _perform_refinement can use it directly
-            async def _process_with_page(j: RefinementJob, p: ConfluencePage):
-                async with refinement_semaphore:
-                    try:
-                        logger.info(
-                            f"Starting background processing for job {j.id} (Page: {j.page_id})"
-                        )
-                        await _perform_refinement(j, p)
-                    except Exception as e:
-                        logger.exception(f"Failed to start refinement for job {j.id}")
-                        j.status = RefinementStatus.FAILED
-                        j.error = str(e)
-                        await save_job(j)
-
             task = asyncio.create_task(_process_with_page(job, page))
             _background_tasks.add(task)
             task.add_done_callback(_background_tasks.discard)

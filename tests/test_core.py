@@ -1,23 +1,33 @@
-import pytest
 from unittest.mock import patch
-from src.confluence_summarizer.models.domain import AnalysisResult, Critique, RefinementStatus, CritiqueSeverity
-from src.confluence_summarizer.agents import analyst, writer, reviewer
+
+import pytest
+
+from src.confluence_summarizer.agents import analyst, reviewer, writer
 from src.confluence_summarizer.agents.common import clean_json_response
+from src.confluence_summarizer.models.domain import (
+    AnalysisResult,
+    Critique,
+    CritiqueSeverity,
+    RefinementStatus,
+)
 from src.confluence_summarizer.services import rag
-import json
+
 
 @pytest.mark.asyncio
 async def test_analyst_agent_parses_json():
     original_text = "This is an outdated guide."
-    mock_response = '''```json
+    mock_response = """```json
     {
       "critiques": [
         {"description": "Outdated word", "severity": "HIGH", "suggestion": "Update it"}
       ]
     }
-    ```'''
+    ```"""
 
-    with patch("src.confluence_summarizer.agents.analyst.generate_response", return_value=mock_response):
+    with patch(
+        "src.confluence_summarizer.agents.analyst.generate_response",
+        return_value=mock_response,
+    ):
         result = await analyst.analyze_content(original_text, ["Context 1"])
 
         assert isinstance(result, AnalysisResult)
@@ -29,7 +39,10 @@ async def test_analyst_agent_parses_json():
 
 @pytest.mark.asyncio
 async def test_analyst_agent_fallback_on_error():
-    with patch("src.confluence_summarizer.agents.analyst.generate_response", return_value="invalid json"):
+    with patch(
+        "src.confluence_summarizer.agents.analyst.generate_response",
+        return_value="invalid json",
+    ):
         result = await analyst.analyze_content("text", [])
         assert isinstance(result, AnalysisResult)
         assert len(result.critiques) == 0
@@ -38,9 +51,18 @@ async def test_analyst_agent_fallback_on_error():
 @pytest.mark.asyncio
 async def test_writer_agent_returns_text():
     mock_rewritten = "This is the updated guide."
-    critiques = AnalysisResult(critiques=[Critique(description="fix", severity=CritiqueSeverity.LOW, suggestion="do it")])
+    critiques = AnalysisResult(
+        critiques=[
+            Critique(
+                description="fix", severity=CritiqueSeverity.LOW, suggestion="do it"
+            )
+        ]
+    )
 
-    with patch("src.confluence_summarizer.agents.writer.generate_response", return_value=mock_rewritten):
+    with patch(
+        "src.confluence_summarizer.agents.writer.generate_response",
+        return_value=mock_rewritten,
+    ):
         result = await writer.rewrite_content("old text", critiques, ["context"])
         assert result == mock_rewritten
 
@@ -50,7 +72,10 @@ async def test_reviewer_agent_parses_status():
     mock_response = '{"status": "accepted", "feedback": "Looks good"}'
     critiques = AnalysisResult(critiques=[])
 
-    with patch("src.confluence_summarizer.agents.reviewer.generate_response", return_value=mock_response):
+    with patch(
+        "src.confluence_summarizer.agents.reviewer.generate_response",
+        return_value=mock_response,
+    ):
         result = await reviewer.review_content("old text", "new text", critiques)
         assert result.status == RefinementStatus.COMPLETED
         assert result.feedback == "Looks good"
@@ -61,7 +86,10 @@ async def test_reviewer_agent_handles_failed_status():
     mock_response = '{"status": "failed", "feedback": "Bad rewrite"}'
     critiques = AnalysisResult(critiques=[])
 
-    with patch("src.confluence_summarizer.agents.reviewer.generate_response", return_value=mock_response):
+    with patch(
+        "src.confluence_summarizer.agents.reviewer.generate_response",
+        return_value=mock_response,
+    ):
         result = await reviewer.review_content("old text", "new text", critiques)
         assert result.status == RefinementStatus.FAILED
         assert result.feedback == "Bad rewrite"
@@ -71,14 +99,17 @@ async def test_reviewer_agent_handles_failed_status():
 async def test_reviewer_agent_fallback_on_error():
     critiques = AnalysisResult(critiques=[])
 
-    with patch("src.confluence_summarizer.agents.reviewer.generate_response", return_value="not json"):
+    with patch(
+        "src.confluence_summarizer.agents.reviewer.generate_response",
+        return_value="not json",
+    ):
         result = await reviewer.review_content("old text", "new text", critiques)
         assert result.status == RefinementStatus.FAILED
         assert "Failed to parse" in result.feedback
 
 
 def test_clean_json_response():
-    raw = "Here is your JSON:\n```json\n{\"key\": \"value\"}\n```\nHope it helps."
+    raw = 'Here is your JSON:\n```json\n{"key": "value"}\n```\nHope it helps.'
     cleaned = clean_json_response(raw)
     assert cleaned == '{"key": "value"}'
 

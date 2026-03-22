@@ -1,8 +1,9 @@
 import json
 from typing import List
+
 from src.confluence_summarizer.agents.common import (
-    generate_response,
     clean_json_response,
+    generate_response,
 )
 from src.confluence_summarizer.models.domain import AnalysisResult
 
@@ -19,7 +20,7 @@ async def analyze_content(original_text: str, context: List[str]) -> AnalysisRes
     )
 
     context_str = "\n".join(
-        [f"Context Block {i+1}: {ctx}" for i, ctx in enumerate(context)]
+        [f"Context Block {i + 1}: {ctx}" for i, ctx in enumerate(context)]
     )
     prompt = (
         f"Original Text:\n{original_text}\n\n"
