@@ -1,58 +1,28 @@
 import json
-from src.confluence_summarizer.agents.common import (
-    generate_response,
-    clean_json_response,
-)
-from src.confluence_summarizer.models.domain import RefinementStatus, AnalysisResult
-from pydantic import BaseModel, Field
+from src.confluence_summarizer.agents.common import generate_response, clean_json_response
+from src.confluence_summarizer.models.domain import ReviewerResponse, RefinementStatus
 
+async def review_page(original_content: str, rewritten_content: str) -> ReviewerResponse:
+    """Palette / Quality Assurance: Verifica a aderência final entre as versões original e reescrita."""
+    system = """Você é um Revisor de Documentações Técnicas do Confluence.
+Avalie se a reescrita preserva as intenções originais, melhora o conteúdo seguindo os feedbacks e se o HTML está bem formado.
+Responda EXCLUSIVAMENTE em JSON no formato:
+{
+  "status": "approved|rejected",
+  "feedback": "motivo para aprovar ou rejeitar."
+}"""
 
-class ReviewResult(BaseModel):
-    status: RefinementStatus = Field(
-        description="Review decision (accepted, pending, failed)."
-    )
-    feedback: str = Field(description="Optional feedback.")
-
-
-async def review_content(
-    original_text: str, rewritten_text: str, critiques: AnalysisResult
-) -> ReviewResult:
-    """Review the rewritten content against the original and critiques."""
-
-    system_prompt = (
-        "You are a Reviewer Agent. Your task is to evaluate the rewritten Confluence documentation "
-        "against the original text and the Analyst's critiques. Ensure the rewritten text is coherent, "
-        "factually correct, and has properly addressed the critiques. "
-        "Respond in JSON format with two keys: 'status' (can be 'completed', 'accepted', 'approved', "
-        "'failed', 'pending') and 'feedback' (string detailing your decision)."
-    )
-
-    critiques_str = "\n".join(
-        [f"- {c.severity.upper()}: {c.description}" for c in critiques.critiques]
-    )
-
-    prompt = (
-        f"Original Text:\n{original_text}\n\n"
-        f"Rewritten Text:\n{rewritten_text}\n\n"
-        f"Analyst Critiques:\n{critiques_str}\n\n"
-        "Please provide your review in JSON format."
-    )
-
-    response = await generate_response(prompt=prompt, system_prompt=system_prompt)
-    cleaned_json = clean_json_response(response)
+    user_prompt = f"Original:\n{original_content}\n\nReescrito:\n{rewritten_content}"
+    response_text = await generate_response(system, user_prompt)
 
     try:
-        data = json.loads(cleaned_json)
-        status_str = data.get("status", "pending").lower()
-        if status_str in ["accepted", "approved", "completed"]:
-            status = RefinementStatus.COMPLETED
-        elif status_str == "failed":
-            status = RefinementStatus.FAILED
+        data = json.loads(clean_json_response(response_text))
+        status_raw = data.get("status", "").lower()
+        if status_raw in ["approved", "accepted", "completed"]:
+            data["status"] = RefinementStatus.COMPLETED.value
         else:
-            status = RefinementStatus.PENDING
+            data["status"] = RefinementStatus.REJECTED.value
 
-        return ReviewResult(status=status, feedback=data.get("feedback", ""))
+        return ReviewerResponse(**data)
     except Exception as e:
-        return ReviewResult(
-            status=RefinementStatus.FAILED, feedback=f"Failed to parse review: {e}"
-        )
+        raise RuntimeError(f"Falha ao realizar a revisão final ou JSON inválido: {e}")

@@ -1,44 +1,33 @@
 import json
-from typing import List
-from src.confluence_summarizer.agents.common import (
-    generate_response,
-    clean_json_response,
-)
-from src.confluence_summarizer.models.domain import AnalysisResult
+from src.confluence_summarizer.agents.common import generate_response, clean_json_response
+from src.confluence_summarizer.models.domain import AnalystResponse
 
+async def analyze_page(content: str) -> AnalystResponse:
+    """Sentinel / Critic Agent: analisa o conteúdo cru buscando falhas de estrutura, semântica e atualização."""
+    system = """Você é um Analista Crítico de Documentação do Confluence.
+Seu objetivo é extrair falhas, desatualizações e problemas de formatação.
+Responda EXCLUSIVAMENTE em JSON no formato:
+{
+  "critiques": [
+    {
+      "issue": "descrição",
+      "severity": "low|medium|high|critical",
+      "suggestion": "como arrumar"
+    }
+  ]
+}
+"""
+    user_prompt = f"Conteúdo da página:\n\n{content}"
+    response_text = await generate_response(system, user_prompt)
 
-async def analyze_content(original_text: str, context: List[str]) -> AnalysisResult:
-    """Analyze the content against the given context to identify flaws."""
-
-    system_prompt = (
-        "You are an Analyst Agent. Your task is to review the provided Confluence documentation text "
-        "and compare it against the provided context. Identify any flaws, outdated information, formatting issues, "
-        "or inconsistencies. Provide a list of critiques in a structured JSON format matching this schema:\n"
-        '{"critiques": [{"description": "Issue description", "severity": "low|medium|high", '
-        '"suggestion": "How to fix"}]}'
-    )
-
-    context_str = "\n".join(
-        [f"Context Block {i+1}: {ctx}" for i, ctx in enumerate(context)]
-    )
-    prompt = (
-        f"Original Text:\n{original_text}\n\n"
-        f"Context from RAG:\n{context_str}\n\n"
-        "Please provide the critiques in JSON format."
-    )
-
-    response = await generate_response(prompt=prompt, system_prompt=system_prompt)
-    cleaned_json = clean_json_response(response)
-
+    cleaned = clean_json_response(response_text)
     try:
-        data = json.loads(cleaned_json)
-        # Normalize severity to lowercase to ensure Pydantic validation passes
+        data = json.loads(cleaned)
+        # Normalização do case da severity antes da validação do Pydantic
         if "critiques" in data:
             for critique in data["critiques"]:
                 if "severity" in critique and isinstance(critique["severity"], str):
                     critique["severity"] = critique["severity"].lower()
-
-        return AnalysisResult(**data)
-    except Exception:
-        # Fallback empty result
-        return AnalysisResult(critiques=[])
+        return AnalystResponse(**data)
+    except Exception as e:
+        raise RuntimeError(f"Falha ao realizar análise do Analyst Agent ou JSON inválido: {e}")

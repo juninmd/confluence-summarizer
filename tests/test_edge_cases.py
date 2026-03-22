@@ -1,113 +1,75 @@
 import pytest
-from unittest.mock import patch, AsyncMock
-import httpx
-from src.confluence_summarizer.services import confluence
-from src.confluence_summarizer.models.domain import ConfluencePage
-from src.confluence_summarizer.agents import common
+
+
+from unittest.mock import AsyncMock
+from src.confluence_summarizer.main import _perform_refinement
+from src.confluence_summarizer.database import update_job, get_job, init_db
+from src.confluence_summarizer.services.confluence import get_pages_in_space, init_client, close_client
 from src.confluence_summarizer.config import settings
-import logging
 
-@pytest.fixture
-def mock_httpx_client():
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
-    # Patch the global client to simulate init
-    confluence._client = mock_client
-    yield mock_client
-    confluence._client = None
-
-@pytest.mark.asyncio
-async def test_get_page_success(mock_httpx_client):
-    mock_response = httpx.Response(
-        status_code=200,
-        json={
-            "id": "123",
-            "title": "Test Page",
-            "space": {"key": "TS"},
-            "body": {"storage": {"value": "<p>Content</p>"}}
-        },
-        request=httpx.Request("GET", "http://mock")
-    )
-    mock_httpx_client.get.return_value = mock_response
-
-    page = await confluence.get_page("123")
-    assert isinstance(page, ConfluencePage)
-    assert page.id == "123"
-    assert page.title == "Test Page"
-    assert page.space_key == "TS"
-    assert page.body == "<p>Content</p>"
+@pytest.fixture(autouse=True)
+def setup_teardown_db():
+    import os
+    if os.path.exists("jobs_test.db"):
+        os.remove("jobs_test.db")
+    settings.db_path = "jobs_test.db"
+    init_db()
 
 @pytest.mark.asyncio
-async def test_get_page_retry_failure(mock_httpx_client):
-    mock_response = httpx.Response(
-        status_code=500,
-        json={"error": "Server error"},
-        request=httpx.Request("GET", "http://mock")
-    )
-    mock_httpx_client.get.return_value = mock_response
+async def test_refinement_error_handling(mocker):
+    """Testa captura de exceção e set do job status FAILED durante refinamento."""
+    # Ensure it mocks correctly as an async exception
+    mock_get = AsyncMock(side_effect=Exception("API Down"))
+    mocker.patch("src.confluence_summarizer.main.get_page_by_id", mock_get)
+    job_id = "test-fail-123"
 
-    from tenacity import RetryError
-    with pytest.raises(RetryError):
-        await confluence.get_page("123")
+    # Needs to be created before updated
+    from src.confluence_summarizer.database import create_job
+    await create_job(job_id, "page_err_id")
+
+    await _perform_refinement(job_id, "page_err_id")
+
+    job = await get_job(job_id)
+    assert job.status == "FAILED"
+    assert "API Down" in job.error
 
 @pytest.mark.asyncio
-async def test_get_pages_from_space_pagination(mock_httpx_client):
-    page_1 = {
-        "results": [
-            {
-                "id": "1",
-                "title": "Page 1",
-                "body": {"storage": {"value": "Body 1"}}
-            }
-        ],
-        "_links": {"next": "/next-page"}
+async def test_confluence_pagination(mocker):
+    """Verifica lógica de limite e chunks para Confluence GET Pages in Space usando links iterativos."""
+    # Primeiro mocka a resposta com próxima página
+    mock_resp_1 = mocker.Mock()
+    mock_resp_1.raise_for_status = mocker.Mock()
+    mock_resp_1.json.return_value = {
+        "results": [{"id": "1"}, {"id": "2"}],
+        "_links": {"next": "/wiki/api/v2/spaces/TEST/pages?cursor=abcd"}
     }
 
-    page_2 = {
-        "results": [
-            {
-                "id": "2",
-                "title": "Page 2",
-                "body": {"storage": {"value": "Body 2"}}
-            }
-        ]
+    # Segunda reposta sem próxima página
+    mock_resp_2 = mocker.Mock()
+    mock_resp_2.raise_for_status = mocker.Mock()
+    mock_resp_2.json.return_value = {
+        "results": [{"id": "3"}],
+        "_links": {}
     }
 
-    mock_httpx_client.get.side_effect = [
-        httpx.Response(200, json=page_1, request=httpx.Request("GET", "http://mock")),
-        httpx.Response(200, json=page_2, request=httpx.Request("GET", "http://mock"))
-    ]
+    mock_client = AsyncMock()
+    mock_client.get.side_effect = [mock_resp_1, mock_resp_2]
 
-    pages = await confluence.get_pages_from_space("SPACE", limit=None)
-    assert len(pages) == 2
-    assert pages[0].id == "1"
-    assert pages[1].id == "2"
+    mocker.patch("src.confluence_summarizer.services.confluence._client", mock_client)
+    mocker.patch("src.confluence_summarizer.services.confluence._get_http_client", return_value=mock_client)
 
-@pytest.mark.asyncio
-async def test_confluence_auth_warning(caplog):
-    caplog.set_level(logging.WARNING)
-    settings.CONFLUENCE_USERNAME = ""
-    settings.CONFLUENCE_API_TOKEN = ""
-    auth = confluence._get_auth()
-    assert auth is None
-    assert "Confluence credentials are not set" in caplog.text
+    pages = await get_pages_in_space("TEST_SPACE", limit=2)
+    assert len(pages) == 3
+    assert pages[2]["id"] == "3"
+    assert mock_client.get.call_count == 2
 
 @pytest.mark.asyncio
-async def test_agent_common_missing_key(caplog):
-    caplog.set_level(logging.WARNING)
-    settings.OPENAI_API_KEY = ""
-    common._openai_client = None # force re-init
-
-    client = common._get_client()
-    assert client is None
-    assert "OPENAI_API_KEY not set" in caplog.text
-
-    res = await common.generate_response("prompt", "system")
-    assert "Mock critique" in res
-
-@pytest.mark.asyncio
-async def test_confluence_client_unmanaged_warning(caplog):
-    caplog.set_level(logging.WARNING)
-    confluence._client = None
-    client = confluence._get_client()
-    assert "Confluence client is not initialized" in caplog.text
-    assert isinstance(client, httpx.AsyncClient)
+async def test_client_idempotency():
+    """Garante que start e stop client do lifespan não crashem e reaproveitem a pool global."""
+    init_client()
+    import src.confluence_summarizer.services.confluence as conf
+    assert conf._client is not None
+    await close_client()
+    assert conf._client is None
+    # Chamando novamente para testar idempotência
+    await close_client()

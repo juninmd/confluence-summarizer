@@ -2,28 +2,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application configuration settings.
-
-    These are read from environment variables or .env file.
     """
+    Configurações da aplicação.
+    """
+    confluence_url: str = "https://dummy.local"
+    confluence_username: str = "dummy-user"
+    confluence_api_token: str = "dummy-token"
+    openai_api_key: str = "sk-dummy"
+    chroma_db_path: str = "chroma_db"
+    db_path: str = "jobs.db"
 
-    CONFLUENCE_URL: str
-    CONFLUENCE_USERNAME: str
-    CONFLUENCE_API_TOKEN: str
-    OPENAI_API_KEY: str = (
-        ""  # Default empty to allow tests and environments without LLM
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
     )
-    CHROMA_DB_PATH: str = "chroma_db"
-    DB_PATH: str = "jobs.db"
-    INGESTION_CONCURRENCY: int = 10
-    REFINEMENT_CONCURRENCY: int = 5
-
-    model_config = SettingsConfigDict(env_file=".env")
 
 
-# For tests or default load, provide empty defaults
-settings = Settings(
-    CONFLUENCE_URL="http://mock",
-    CONFLUENCE_USERNAME="mock",
-    CONFLUENCE_API_TOKEN="mock",
-)
+settings = Settings()
