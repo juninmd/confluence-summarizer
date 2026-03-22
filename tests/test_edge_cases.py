@@ -29,7 +29,7 @@ async def test_get_page_success(mock_httpx_client):
             "space": {"key": "TS"},
             "body": {"storage": {"value": "<p>Content</p>"}},
         },
-        request=httpx.Request("GET", "http://mock"),
+        request=httpx.Request("GET", "https://dummy.local"),
     )
     mock_httpx_client.get.return_value = mock_response
 
@@ -46,7 +46,7 @@ async def test_get_page_retry_failure(mock_httpx_client):
     mock_response = httpx.Response(
         status_code=500,
         json={"error": "Server error"},
-        request=httpx.Request("GET", "http://mock"),
+        request=httpx.Request("GET", "https://dummy.local"),
     )
     mock_httpx_client.get.return_value = mock_response
 
@@ -72,8 +72,12 @@ async def test_get_pages_from_space_pagination(mock_httpx_client):
     }
 
     mock_httpx_client.get.side_effect = [
-        httpx.Response(200, json=page_1, request=httpx.Request("GET", "http://mock")),
-        httpx.Response(200, json=page_2, request=httpx.Request("GET", "http://mock")),
+        httpx.Response(
+            200, json=page_1, request=httpx.Request("GET", "https://dummy.local")
+        ),
+        httpx.Response(
+            200, json=page_2, request=httpx.Request("GET", "https://dummy.local")
+        ),
     ]
 
     pages = await confluence.get_pages_from_space("SPACE", limit=None)

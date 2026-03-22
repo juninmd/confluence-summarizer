@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
 # For tests or default load, provide empty defaults
 settings = Settings(
-    CONFLUENCE_URL="http://mock",
-    CONFLUENCE_USERNAME="mock",
-    CONFLUENCE_API_TOKEN="mock",
+    CONFLUENCE_URL="https://dummy.local",
+    CONFLUENCE_USERNAME="dummy-user",
+    CONFLUENCE_API_TOKEN="dummy-token",
 )
