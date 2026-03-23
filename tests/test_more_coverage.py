@@ -91,7 +91,9 @@ async def test_get_pages_pagination_no_links(mock_chroma):
         m_client = AsyncMock()
         m_client_getter.return_value = m_client
         m_response = httpx.Response(
-            200, json={"results": []}, request=httpx.Request("GET", "https://dummy.local")
+            200,
+            json={"results": []},
+            request=httpx.Request("GET", "https://dummy.local"),
         )
         m_client.get.return_value = m_response
 
@@ -107,7 +109,9 @@ async def test_update_page_failure(mock_chroma):
         m_client = AsyncMock()
         m_client_getter.return_value = m_client
         m_response = httpx.Response(
-            500, json={"error": "fail"}, request=httpx.Request("PUT", "https://dummy.local")
+            500,
+            json={"error": "fail"},
+            request=httpx.Request("PUT", "https://dummy.local"),
         )
         m_client.put.return_value = m_response
 
