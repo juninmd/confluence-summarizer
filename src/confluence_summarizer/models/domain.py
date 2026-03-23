@@ -96,6 +96,7 @@ class ConfluencePage(BaseModel):
     version: int
     version: int
     version: int
+    version: int
     version: int = 1
     url: str = ""
 
