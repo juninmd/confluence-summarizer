@@ -1,106 +1,98 @@
-import asyncio
 import logging
-from typing import Any, List
+import asyncio
+from typing import List, Optional
 
 import chromadb
+from chromadb.api.types import Metadata
 from chromadb.config import Settings as ChromaSettings
 
-from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.models.domain import ConfluencePage
+from confluence_summarizer.config import settings
+from confluence_summarizer.models import PageData
 
 logger = logging.getLogger(__name__)
 
-_chroma_client = None
-_collection = None
+_chroma_client: Optional[chromadb.ClientAPI] = None
 
 
-def _get_collection() -> Any:
-    global _chroma_client, _collection
+def _get_client() -> chromadb.ClientAPI:
+    global _chroma_client
     if _chroma_client is None:
         _chroma_client = chromadb.PersistentClient(
-            path=settings.CHROMA_DB_PATH, settings=ChromaSettings(allow_reset=True)
+            path=settings.CHROMA_DB_PATH, settings=ChromaSettings(anonymized_telemetry=False)
         )
-        _collection = _chroma_client.get_or_create_collection(
-            name="confluence_pages", metadata={"hnsw:space": "cosine"}
-        )
-    return _collection
+    return _chroma_client
 
 
-def chunk_text(text: str, max_chunk_size: int = 1000, overlap: int = 100) -> List[str]:
-    """Splits a long text into chunks of `max_chunk_size` characters with `overlap` characters overlap."""
-    if not text:
-        return []
-
-    chunks: List[str] = []
+def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
+    chunks = []
     start = 0
-    text_len = len(text)
+    text_length = len(text)
 
-    while start < text_len:
-        end = min(start + max_chunk_size, text_len)
-
-        # If we're not at the end of the text, try to find a word boundary
-        if end < text_len:
-            # Look for the last space character before the end
+    while start < text_length:
+        end = min(start + chunk_size, text_length)
+        if end < text_length:
+            # Try to break at a space
             last_space = text.rfind(" ", start, end)
-            if last_space != -1 and last_space > start + overlap:
+            if last_space > start:
                 end = last_space
 
-        chunks.append(text[start:end].strip())
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
 
-        # Move start forward, ensuring we make progress even with large words
         start = end - overlap
-        if start <= 0 or end == text_len:
+        if start < 0 or end == text_length:
             start = end
 
-    return [c for c in chunks if c]
+        # Avoid infinite loops for huge words without spaces
+        if start <= end - chunk_size and start < text_length:
+            start = end
+
+    return chunks
 
 
-def _ingest_page(page: ConfluencePage) -> None:
-    """Synchronous function to ingest a single page into ChromaDB."""
-    col = _get_collection()
+def _ingest_page(page: PageData) -> None:
+    client = _get_client()
+    collection = client.get_or_create_collection("confluence_pages")
+
     try:
-        # First, delete existing chunks for this page to prevent duplication on re-ingestion
-        col.delete(where={"page_id": page.id})
+        # Delete old chunks for this page
+        existing = collection.get(where={"page_id": page.page_id})
+        if existing and existing["ids"]:
+            collection.delete(ids=existing["ids"])
     except Exception as e:
-        logger.warning(f"Failed to delete existing chunks for page {page.id}: {e}")
+        logger.warning(f"Error cleaning up old chunks for page {page.page_id}: {e}")
 
-    chunks = chunk_text(page.body)
+    chunks = chunk_text(page.content)
     if not chunks:
         return
 
-    ids = [f"{page.id}_chunk_{i}" for i in range(len(chunks))]
-    metadatas: List[Any] = [
-        {
-            "page_id": str(page.id),
-            "title": str(page.title),
-            "space_key": str(page.space_key),
-            "chunk_index": i,
-        }
-        for i in range(len(chunks))
+    ids = [f"{page.page_id}_chunk_{i}" for i in range(len(chunks))]
+    metadatas: List[Metadata] = [
+        {"page_id": page.page_id, "space_key": page.space_key, "title": page.title} for _ in chunks
     ]
 
-    # Type hinting workaround for ChromaDB metadatas
-    col.add(documents=chunks, metadatas=metadatas, ids=ids)  # type: ignore
+    collection.add(documents=chunks, metadatas=metadatas, ids=ids)
 
 
-async def ingest_page(page: ConfluencePage) -> None:
-    """Asynchronously ingest a page into ChromaDB using a thread pool."""
+async def ingest_page(page: PageData) -> None:
     await asyncio.to_thread(_ingest_page, page)
 
 
-def _query_context(query_text: str, n_results: int = 5) -> List[str]:
-    """Synchronous function to query ChromaDB for context."""
-    col = _get_collection()
-    results = col.query(query_texts=[query_text], n_results=n_results)
+def _search(query: str, space_key: str, n_results: int = 3) -> List[str]:
+    client = _get_client()
+    try:
+        collection = client.get_collection("confluence_pages")
+    except Exception:
+        return []
 
-    documents = results.get("documents", [])
-    if documents and len(documents) > 0:
-        return documents[
-            0
-        ]  # Return the first list of documents (for the single query text)
-    return []
+    results = collection.query(query_texts=[query], n_results=n_results, where={"space_key": space_key})
+
+    if not results or not results["documents"] or not results["documents"][0]:
+        return []
+
+    return results["documents"][0]
 
 
-async def query_context(query_text: str, n_results: int = 5) -> List[str]:
-    """Asynchronously query context from ChromaDB using a thread pool."""
-    return await asyncio.to_thread(_query_context, query_text, n_results)
+async def search(query: str, space_key: str, n_results: int = 3) -> List[str]:
+    return await asyncio.to_thread(_search, query, space_key, n_results)

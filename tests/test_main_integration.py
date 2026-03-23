@@ -1,89 +1,83 @@
-from unittest.mock import AsyncMock, patch
-
-import httpx
 import pytest
-from fastapi.testclient import TestClient
+import httpx
+from httpx import ASGITransport
+import sqlite3
+import os
 
-from src.confluence_summarizer import config
-from src.confluence_summarizer.database import init_db, save_job_sync
-from src.confluence_summarizer.main import app
-from src.confluence_summarizer.models.domain import (
-    RefinementJob,
-    RefinementStatus,
-)
-
-client = TestClient(app)
-
+from confluence_summarizer.main import app
+from confluence_summarizer.models import RefinementStatus
+from confluence_summarizer.config import settings
 
 @pytest.fixture(autouse=True)
-def setup_db(tmp_path):
-    db_path = tmp_path / "test_jobs.db"
-    config.settings.DB_PATH = str(db_path)
-    init_db()
+def setup_db():
+    # Force initialize the DB for tests
+    conn = sqlite3.connect(settings.DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jobs (
+            job_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            page_id TEXT,
+            space_key TEXT,
+            error TEXT,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    yield
+
+    # Optional teardown
+    if os.path.exists(settings.DB_PATH):
+        try:
+            os.remove(settings.DB_PATH)
+            if os.path.exists(f"{settings.DB_PATH}-wal"):
+                os.remove(f"{settings.DB_PATH}-wal")
+            if os.path.exists(f"{settings.DB_PATH}-shm"):
+                os.remove(f"{settings.DB_PATH}-shm")
+        except Exception:
+            pass
 
 
 @pytest.fixture
-def mock_confluence_client():
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
-    with patch(
-        "src.confluence_summarizer.services.confluence._get_client",
-        return_value=mock_client,
-    ):
-        yield mock_client
+async def client():
+    async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
 
 
 @pytest.mark.asyncio
-async def test_refine_page_endpoint(mock_confluence_client):
-    # Mocking background tasks to not actually run for the endpoint test
-    with patch(
-        "src.confluence_summarizer.main.BackgroundTasks.add_task"
-    ) as mock_add_task:
-        response = client.post("/refine/test-page-id")
-
-        assert response.status_code == 202
-        data = response.json()
-        assert data["message"] == "Refinement job accepted"
-        assert "job_id" in data
-        assert data["page_id"] == "test-page-id"
-
-        # Check background task was queued
-        assert mock_add_task.called
+async def test_app_lifespan(client):
+    response = await client.get("/status/dummy-job")
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_refine_space_endpoint():
-    with patch(
-        "src.confluence_summarizer.main.BackgroundTasks.add_task"
-    ) as mock_add_task:
-        response = client.post("/refine/space/TESTSPACE")
+async def test_job_flow(client, monkeypatch):
+    from confluence_summarizer.database import get_job, update_job_status
 
-        assert response.status_code == 202
-        data = response.json()
-        assert data["message"] == "Space refinement job accepted"
-        assert data["space_key"] == "TESTSPACE"
-        assert mock_add_task.called
-
-
-@pytest.mark.asyncio
-async def test_get_status_endpoint():
-    job = RefinementJob(
-        id="test-job-id",
-        page_id="test-page-id",
-        status=RefinementStatus.COMPLETED,
-        refined_text="Done.",
-    )
-    save_job_sync(job)
-
-    response = client.get("/status/test-job-id")
+    # Create job
+    response = await client.post("/refine/12345")
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == "test-job-id"
-    assert data["status"] == "completed"
-    assert data["refined_text"] == "Done."
+    assert "job_id" in data
+    assert data["status"] == "PENDING"
 
+    job_id = data["job_id"]
 
-@pytest.mark.asyncio
-async def test_get_status_not_found():
-    response = client.get("/status/non-existent-job")
-    assert response.status_code == 404
-    assert response.json() == {"detail": "Job not found"}
+    # Check status
+    response = await client.get(f"/status/{job_id}")
+    assert response.status_code == 200
+    assert response.json()["status"] in ["PENDING", "IN_PROGRESS", "FAILED", "COMPLETED"]
+
+    # Manually update job to completed
+    await update_job_status(job_id, RefinementStatus.COMPLETED)
+
+    # Publish job
+    response = await client.post(f"/publish/{job_id}")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Job published successfully"}
+

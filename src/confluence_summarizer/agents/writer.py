@@ -1,39 +1,34 @@
 from typing import List
 
-from src.confluence_summarizer.agents.common import generate_response
-from src.confluence_summarizer.models.domain import AnalysisResult
+from confluence_summarizer.models import Critique
+from confluence_summarizer.agents.common import generate_response
+
+system_message = """
+You are a Staff Software Engineer and Documentation Writer.
+Your task is to re-write a Confluence page to address the critiques provided by the Analyst, while maintaining consistency with the broader space context.
+
+Guidelines:
+1. Retain any HTML formatting/structure (like macros or macros-like structure) unless it needs to be corrected.
+2. Incorporate factual corrections from the RAG context.
+3. Ensure the tone is professional, technical, and clear.
+4. Output ONLY the rewritten content without markdown code blocks.
+"""
 
 
-async def rewrite_content(
-    original_text: str, critiques: AnalysisResult, context: List[str]
-) -> str:
-    """Rewrite the content based on critiques and context."""
+async def rewrite_page(original_content: str, critiques: List[Critique], context_chunks: List[str]) -> str:
+    critiques_text = "\n".join([f"- {c.severity.upper()}: {c.issue}\n  Suggestion: {c.suggestion}" for c in critiques])
+    context_text = "\n\n".join(context_chunks) if context_chunks else "No additional context available."
 
-    system_prompt = (
-        "You are a Writer Agent. Your task is to rewrite the provided Confluence documentation "
-        "incorporating the provided critiques and ensuring it is consistent with the provided context. "
-        "Return ONLY the rewritten markdown text, without any introductory or concluding remarks."
-    )
+    prompt = f"""
+ORIGINAL CONTENT:
+{original_content}
 
-    critiques_str = "\n".join(
-        [
-            f"- {c.severity.upper()}: {c.description} -> Suggestion: {c.suggestion}"
-            for c in critiques.critiques
-        ]
-    )
+CRITIQUES TO ADDRESS:
+{critiques_text}
 
-    context_str = "\n".join(
-        [f"Context Block {i + 1}: {ctx}" for i, ctx in enumerate(context)]
-    )
+RAG CONTEXT (use this to fix factual inconsistencies):
+{context_text}
 
-    prompt = (
-        f"Original Text:\n{original_text}\n\n"
-        f"Critiques from Analyst:\n{critiques_str}\n\n"
-        f"Context from RAG:\n{context_str}\n\n"
-        "Please rewrite the document."
-    )
-
-    response = await generate_response(prompt=prompt, system_prompt=system_prompt)
-    if not response:
-        raise ValueError("Writer agent returned an empty response.")
-    return response.strip()
+Write the final updated content:
+"""
+    return await generate_response(prompt, system_message, response_format="text")
