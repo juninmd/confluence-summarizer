@@ -1,41 +1,39 @@
 import logging
-import urllib.parse
-from typing import Any, AsyncGenerator, Dict, Optional, Tuple
+from typing import Any, List, Optional
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
-from confluence_summarizer.config import settings
-from confluence_summarizer.models import PageData
+from src.confluence_summarizer.config import settings
+from src.confluence_summarizer.models.domain import ConfluencePage
 
 logger = logging.getLogger(__name__)
 
 _client: Optional[httpx.AsyncClient] = None
 
 
-def _get_auth() -> Optional[Tuple[str, str]]:
-    if (
-        not settings.CONFLUENCE_USERNAME
-        or not settings.CONFLUENCE_API_TOKEN
-        or settings.CONFLUENCE_API_TOKEN == "dummy"
-    ):
-        logger.warning("Missing Confluence credentials. Auth will not be used.")
+def _get_auth() -> Optional[tuple[str, str]]:
+    if not settings.CONFLUENCE_USERNAME or not settings.CONFLUENCE_API_TOKEN:
+        logger.warning("Confluence credentials are not set. API calls will fail.")
         return None
     return (settings.CONFLUENCE_USERNAME, settings.CONFLUENCE_API_TOKEN)
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        logger.warning("Shared Confluence client not initialized, falling back to a temporary client.")
-        return httpx.AsyncClient(timeout=30.0)
-    return _client
 
 
 async def init_client() -> None:
     global _client
     if _client is None:
-        _client = httpx.AsyncClient(timeout=30.0)
+        auth = _get_auth()
+        _client = httpx.AsyncClient(
+            base_url=settings.CONFLUENCE_URL,
+            auth=auth if auth else None,
+            timeout=httpx.Timeout(30.0),
+            headers={"Accept": "application/json"},
+        )
 
 
 async def close_client() -> None:
@@ -45,57 +43,130 @@ async def close_client() -> None:
         _client = None
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def get_page(page_id: str) -> PageData:
+def _get_client() -> httpx.AsyncClient:
+    if _client is None:
+        logger.warning(
+            "Confluence client is not initialized. Falling back to an unmanaged client."
+        )
+        auth = _get_auth()
+        return httpx.AsyncClient(
+            base_url=settings.CONFLUENCE_URL,
+            auth=auth if auth else None,
+            timeout=httpx.Timeout(30.0),
+            headers={"Accept": "application/json"},
+        )
+    return _client
+
+
+def clean_html(html_content: str) -> str:
+    # Just return raw HTML to preserve structure for the agents
+    return html_content
+
+
+@retry(
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+)
+async def get_page(page_id: str) -> ConfluencePage:
     client = _get_client()
-    url = f"{settings.CONFLUENCE_URL}/wiki/api/v2/pages/{urllib.parse.quote(page_id)}?body-format=storage"
-    auth = _get_auth()
-    response = await client.get(url, auth=auth)
+    # Confluence API v1 to ensure space_key is available as expected
+    response = await client.get(
+        f"/wiki/rest/api/content/{page_id}?expand=body.storage,space"
+    )
     response.raise_for_status()
     data = response.json()
 
-    return PageData(
-        page_id=str(data["id"]),
-        space_key=data.get("spaceId", ""),  # Confluence v2 returns spaceId instead of space_key for this endpoint
+    body = ""
+    if "body" in data and "storage" in data["body"]:
+        body = clean_html(data["body"]["storage"].get("value", ""))
+
+    space_key = "unknown"
+    if "space" in data and "key" in data["space"]:
+        space_key = data["space"]["key"]
+
+    version = data.get("version", {}).get("number", 1)
+    webui = data.get("_links", {}).get("webui", "")
+    page_url = f"{settings.CONFLUENCE_URL}{webui}" if webui else ""
+
+    return ConfluencePage(
+        id=str(data["id"]),
         title=data["title"],
-        content=data.get("body", {}).get("storage", {}).get("value", ""),
-        version=data.get("version", {}).get("number", 1),
+        space_key=space_key,
+        body=body,
+        version=version,
+        url=page_url,
     )
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def get_pages_in_space(space_key: str) -> AsyncGenerator[PageData, None]:
+@retry(
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+)
+async def get_pages_from_space(
+    space_key: str, limit: Optional[int] = None, page_size: int = 50
+) -> List[ConfluencePage]:
     client = _get_client()
-    auth = _get_auth()
-    # Confluence API v2 uses a different approach. First we might need the space ID, but let's assume space_key is accepted by some endpoint or we search.
-    # To keep it simple, we'll use the v1 API for space pages since it's easier to paginate by space key
-    base_url = f"{settings.CONFLUENCE_URL}/wiki/rest/api/content"
-    params: Dict[str, Any] = {
-        "spaceKey": urllib.parse.quote(space_key),
-        "expand": "body.storage,version",
-        "limit": 50,
-        "start": 0,
-    }
+    pages: List[ConfluencePage] = []
 
-    while True:
-        response = await client.get(base_url, params=params, auth=auth)
+    url = f"/wiki/rest/api/content?spaceKey={space_key}&expand=body.storage,version&limit={page_size}"
+
+    while url:
+        response = await client.get(url)
         response.raise_for_status()
         data = response.json()
 
-        results = data.get("results", [])
-        if not results:
-            break
+        for item in data.get("results", []):
+            body = ""
+            if "body" in item and "storage" in item["body"]:
+                body = clean_html(item["body"]["storage"].get("value", ""))
 
-        for result in results:
-            yield PageData(
-                page_id=str(result["id"]),
-                space_key=space_key,
-                title=result["title"],
-                content=result.get("body", {}).get("storage", {}).get("value", ""),
-                version=result.get("version", {}).get("number", 1),
+            version = item.get("version", {}).get("number", 1)
+            webui = item.get("_links", {}).get("webui", "")
+            page_url = f"{settings.CONFLUENCE_URL}{webui}" if webui else ""
+
+            pages.append(
+                ConfluencePage(
+                    id=str(item["id"]),
+                    title=item["title"],
+                    space_key=space_key,
+                    body=body,
+                    version=version,
+                    url=page_url,
+                )
             )
 
-        if "next" not in data.get("_links", {}):
-            break
+            if limit and len(pages) >= limit:
+                return pages[:limit]
 
-        params["start"] += params["limit"]
+        links = data.get("_links", {})
+        if "next" in links:
+            # The next link might be a relative path without /wiki
+            next_link = links["next"]
+            url = next_link if next_link.startswith("/wiki") else f"/wiki{next_link}"
+        else:
+            url = ""
+
+    return pages
+
+
+@retry(
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+)
+async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
+    """Publish a new version of the page back to Confluence."""
+    client = _get_client()
+    payload = {
+        "id": page_id,
+        "status": "current",
+        "title": title,
+        "body": {"representation": "storage", "value": body},
+        "version": {"number": version_number},
+    }
+    # Using v2 API for updates
+    response = await client.put(f"/wiki/api/v2/pages/{page_id}", json=payload)
+    response.raise_for_status()
+    return response.json()

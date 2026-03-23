@@ -1,22 +1,12 @@
-# SQLite
-*.db
-*.db-journal
-*.db-shm
-*.db-wal
-
-# ChromaDB
-chroma_db/
-chroma.sqlite3
-
-# Python
+.venv
 __pycache__/
 *.pyc
-.pytest_cache/
+.pytest_cache
 .coverage
+.ruff_cache/
+coverage.xml
 
-# Env
-.env
-
-# Editor
-.vscode/
-.idea/
+# Databases
+*.db
+*.db-*
+chroma_db/
