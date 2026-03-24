@@ -22,12 +22,12 @@ async def review_content(
     """Review the rewritten content against the original and critiques.
 
     Args:
-        original_text: The original Confluence documentation text.
-        rewritten_text: The rewritten text produced by the Writer Agent.
-        critiques: The critiques provided by the Analyst Agent.
+        original_text (str): The original Confluence documentation text.
+        rewritten_text (str): The rewritten text produced by the Writer Agent.
+        critiques (AnalysisResult): The critiques provided by the Analyst Agent.
 
     Returns:
-        A ReviewResult object containing the status and feedback.
+        ReviewResult: A ReviewResult object containing the status and feedback.
     """
 
     system_prompt = (
