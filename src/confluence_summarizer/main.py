@@ -112,8 +112,8 @@ async def _perform_refinement(job: RefinementJob, page: ConfluencePage):
     """Core logic to refine a single Confluence page.
 
     Args:
-        job: The refinement job to process.
-        page: The original Confluence page to refine.
+        job (RefinementJob): The refinement job to process.
+        page (ConfluencePage): The original Confluence page to refine.
     """
     try:
         # Step 1: Query Context
