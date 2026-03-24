@@ -19,7 +19,16 @@ class ReviewResult(BaseModel):
 async def review_content(
     original_text: str, rewritten_text: str, critiques: AnalysisResult
 ) -> ReviewResult:
-    """Review the rewritten content against the original and critiques."""
+    """Review the rewritten content against the original and critiques.
+
+    Args:
+        original_text: The original Confluence documentation text.
+        rewritten_text: The rewritten text produced by the Writer Agent.
+        critiques: The critiques provided by the Analyst Agent.
+
+    Returns:
+        A ReviewResult object containing the status and feedback.
+    """
 
     system_prompt = (
         "You are a Reviewer Agent. Your task is to evaluate the rewritten Confluence documentation "

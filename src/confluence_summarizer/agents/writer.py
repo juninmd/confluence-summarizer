@@ -7,7 +7,19 @@ from src.confluence_summarizer.models.domain import AnalysisResult
 async def rewrite_content(
     original_text: str, critiques: AnalysisResult, context: List[str]
 ) -> str:
-    """Rewrite the content based on critiques and context."""
+    """Rewrite the content based on critiques and context.
+
+    Args:
+        original_text: The original Confluence documentation text.
+        critiques: The critiques provided by the Analyst Agent.
+        context: Context text retrieved from the vector database.
+
+    Returns:
+        The rewritten text in markdown format.
+
+    Raises:
+        ValueError: If the agent returns an empty response.
+    """
 
     system_prompt = (
         "You are a Writer Agent. Your task is to rewrite the provided Confluence documentation "

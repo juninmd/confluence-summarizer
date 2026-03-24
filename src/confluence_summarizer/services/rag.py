@@ -27,7 +27,16 @@ def _get_collection() -> Any:
 
 
 def chunk_text(text: str, max_chunk_size: int = 1000, overlap: int = 100) -> List[str]:
-    """Splits a long text into chunks of `max_chunk_size` characters with `overlap` characters overlap."""
+    """Splits a long text into chunks with overlap.
+
+    Args:
+        text: The text to be split into chunks.
+        max_chunk_size: Maximum size of each chunk.
+        overlap: Number of characters to overlap between consecutive chunks.
+
+    Returns:
+        List of text chunks.
+    """
     if not text:
         return []
 
@@ -56,7 +65,11 @@ def chunk_text(text: str, max_chunk_size: int = 1000, overlap: int = 100) -> Lis
 
 
 def _ingest_page(page: ConfluencePage) -> None:
-    """Synchronous function to ingest a single page into ChromaDB."""
+    """Synchronous function to ingest a single page into ChromaDB.
+
+    Args:
+        page: The Confluence page to ingest.
+    """
     col = _get_collection()
     try:
         # First, delete existing chunks for this page to prevent duplication on re-ingestion
@@ -84,12 +97,24 @@ def _ingest_page(page: ConfluencePage) -> None:
 
 
 async def ingest_page(page: ConfluencePage) -> None:
-    """Asynchronously ingest a page into ChromaDB using a thread pool."""
+    """Asynchronously ingest a page into ChromaDB using a thread pool.
+
+    Args:
+        page: The Confluence page to ingest.
+    """
     await asyncio.to_thread(_ingest_page, page)
 
 
 def _query_context(query_text: str, n_results: int = 5) -> List[str]:
-    """Synchronous function to query ChromaDB for context."""
+    """Synchronous function to query ChromaDB for context.
+
+    Args:
+        query_text: The text query to search for.
+        n_results: Number of results to return.
+
+    Returns:
+        A list of matching documents.
+    """
     col = _get_collection()
     results = col.query(query_texts=[query_text], n_results=n_results)
 
@@ -102,5 +127,13 @@ def _query_context(query_text: str, n_results: int = 5) -> List[str]:
 
 
 async def query_context(query_text: str, n_results: int = 5) -> List[str]:
-    """Asynchronously query context from ChromaDB using a thread pool."""
+    """Asynchronously query context from ChromaDB using a thread pool.
+
+    Args:
+        query_text: The text query to search for.
+        n_results: Number of results to return.
+
+    Returns:
+        A list of matching documents.
+    """
     return await asyncio.to_thread(_query_context, query_text, n_results)

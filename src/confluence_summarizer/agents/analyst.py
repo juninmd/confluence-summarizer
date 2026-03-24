@@ -9,7 +9,15 @@ from src.confluence_summarizer.models.domain import AnalysisResult
 
 
 async def analyze_content(original_text: str, context: List[str]) -> AnalysisResult:
-    """Analyze the content against the given context to identify flaws."""
+    """Analyze the content against the given context to identify flaws.
+
+    Args:
+        original_text: The original Confluence documentation text.
+        context: Context text retrieved from the vector database.
+
+    Returns:
+        An AnalysisResult object containing the generated critiques.
+    """
 
     system_prompt = (
         "You are an Analyst Agent. Your task is to review the provided Confluence documentation text "

@@ -27,7 +27,17 @@ async def generate_response(
     model: str = "gpt-4-turbo-preview",
     temperature: float = 0.7,
 ) -> str:
-    """Helper function to generate a response from OpenAI's Chat API."""
+    """Helper function to generate a response from OpenAI's Chat API.
+
+    Args:
+        prompt: The user prompt to send to the model.
+        system_prompt: The system instruction prompt.
+        model: The LLM model to use.
+        temperature: The generation temperature.
+
+    Returns:
+        The generated response as a string.
+    """
     client = _get_client()
     if client is None:
         logger.warning("Returning mock response due to missing OpenAI client.")
@@ -50,7 +60,14 @@ async def generate_response(
 
 
 def clean_json_response(raw_text: str) -> str:
-    """Clean markdown code blocks from an LLM JSON response."""
+    """Clean markdown code blocks from an LLM JSON response.
+
+    Args:
+        raw_text: The raw response text containing JSON.
+
+    Returns:
+        The cleaned JSON string.
+    """
     match = re.search(r"```json\s*(.*?)\s*```", raw_text, re.DOTALL)
     if match:
         return match.group(1).strip()
