@@ -31,7 +31,7 @@ def save_job_sync(job: RefinementJob) -> None:
     """Save a job to the database synchronously.
 
     Args:
-        job: The refinement job object to save.
+        job (RefinementJob): The refinement job object to save.
     """
     with sqlite3.connect(settings.DB_PATH) as conn:
         conn.execute(
