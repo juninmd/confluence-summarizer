@@ -157,16 +157,17 @@ async def get_pages_from_space(
     retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
 )
 async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
+async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
     """Publish a new version of the page back to Confluence.
 
     Args:
-        page_id: The ID of the page to update.
-        title: The new title of the page.
-        body: The new body content.
-        version_number: The next version number for the update.
+        page_id (str): The ID of the page to update.
+        title (str): The new title of the page.
+        body (str): The new body content.
+        version_number (int): The next version number for the update.
 
     Returns:
-        The JSON response from the Confluence API.
+        Any: The JSON response from the Confluence API.
     """
     client = _get_client()
     payload = {
