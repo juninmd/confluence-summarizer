@@ -170,6 +170,7 @@ async def update_page(page_id: str, title: str, body: str, version_number: int) 
     Returns:
         Any: The JSON response from the Confluence API.
     """
+    """
     payload = {
         "id": page_id,
         "status": "current",
