@@ -239,7 +239,9 @@ async def test_publish_page_success(mock_confluence_client):
     ):
         mock_get_page.return_value = page
 
-        response = client.post("/publish/pub-job")
+        response = client.post(
+            "/publish/pub-job", headers={"X-API-Key": "dummy-api-key"}
+        )
         assert response.status_code == 200
         assert response.json()["message"] == "Page published successfully"
         assert mock_update_page.called
@@ -247,7 +249,9 @@ async def test_publish_page_success(mock_confluence_client):
 
 @pytest.mark.asyncio
 async def test_publish_page_not_found():
-    response = client.post("/publish/missing-job")
+    response = client.post(
+        "/publish/missing-job", headers={"X-API-Key": "dummy-api-key"}
+    )
     assert response.status_code == 404
 
 
@@ -256,7 +260,7 @@ async def test_publish_page_invalid_status():
     job = RefinementJob(id="bad-job", page_id="page1", status=RefinementStatus.PENDING)
     save_job_sync(job)
 
-    response = client.post("/publish/bad-job")
+    response = client.post("/publish/bad-job", headers={"X-API-Key": "dummy-api-key"})
     assert response.status_code == 400
     assert "Job must be completed" in response.json()["detail"]
 
@@ -276,6 +280,8 @@ async def test_publish_page_failure():
     ) as mock_get_page:
         mock_get_page.side_effect = Exception("Confluence Down")
 
-        response = client.post("/publish/fail-job")
+        response = client.post(
+            "/publish/fail-job", headers={"X-API-Key": "dummy-api-key"}
+        )
         assert response.status_code == 500
         assert "Publishing failed" in response.json()["detail"]
