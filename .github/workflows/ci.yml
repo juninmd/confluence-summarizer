@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -29,3 +31,7 @@ jobs:
         run: uv run pyright src
       - name: Test (pytest)
         run: uv run pytest --cov=src --cov-report=xml
+      - name: Security scan (Bandit)
+        run: uv run bandit -r src -ll -ii
+      - name: Dependency vulnerability scan (safety)
+        run: uv run safety check

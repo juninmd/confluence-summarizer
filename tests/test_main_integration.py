@@ -38,7 +38,9 @@ async def test_refine_page_endpoint(mock_confluence_client):
     with patch(
         "src.confluence_summarizer.main.BackgroundTasks.add_task"
     ) as mock_add_task:
-        response = client.post("/refine/test-page-id")
+        response = client.post(
+            "/refine/test-page-id", headers={"X-API-Key": "dummy-api-key"}
+        )
 
         assert response.status_code == 202
         data = response.json()
@@ -55,7 +57,9 @@ async def test_refine_space_endpoint():
     with patch(
         "src.confluence_summarizer.main.BackgroundTasks.add_task"
     ) as mock_add_task:
-        response = client.post("/refine/space/TESTSPACE")
+        response = client.post(
+            "/refine/space/TESTSPACE", headers={"X-API-Key": "dummy-api-key"}
+        )
 
         assert response.status_code == 202
         data = response.json()
@@ -74,7 +78,7 @@ async def test_get_status_endpoint():
     )
     save_job_sync(job)
 
-    response = client.get("/status/test-job-id")
+    response = client.get("/status/test-job-id", headers={"X-API-Key": "dummy-api-key"})
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "test-job-id"
@@ -84,6 +88,8 @@ async def test_get_status_endpoint():
 
 @pytest.mark.asyncio
 async def test_get_status_not_found():
-    response = client.get("/status/non-existent-job")
+    response = client.get(
+        "/status/non-existent-job", headers={"X-API-Key": "dummy-api-key"}
+    )
     assert response.status_code == 404
     assert response.json() == {"detail": "Job not found"}

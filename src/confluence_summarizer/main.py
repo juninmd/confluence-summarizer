@@ -4,7 +4,22 @@ import uuid
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, HTTPException, status
+from typing import Awaitable, Callable
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    Response,
+    Security,
+    status,
+)
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from src.confluence_summarizer.config import settings
 from src.confluence_summarizer.database import get_job, init_db, save_job
@@ -46,12 +61,51 @@ async def lifespan(app: FastAPI):
     await confluence.close_client()
 
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Confluence Summarizer",
     description="A service to ingest, index, analyze, and refine Confluence documentation.",
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def add_security_headers(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
+    return response
+
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def get_api_key(api_key_header: str | None = Security(api_key_header)) -> str:
+    if not api_key_header or api_key_header != settings.APP_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API Key",
+        )
+    return api_key_header
 
 
 async def _perform_refinement(job: RefinementJob, page: ConfluencePage):
@@ -166,8 +220,12 @@ async def process_space_refinement(space_key: str):
 
 
 @app.post("/refine/{page_id}", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("5/minute")  # type: ignore
 async def refine_page(
-    page_id: str, background_tasks: BackgroundTasks
+    request: Request,
+    page_id: str,
+    background_tasks: BackgroundTasks,
+    api_key: str = Depends(get_api_key),
 ) -> Dict[str, Any]:
     """Start the refinement process for a single Confluence page."""
     job_id = str(uuid.uuid4())
@@ -179,8 +237,12 @@ async def refine_page(
 
 
 @app.post("/refine/space/{space_key}", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("2/minute")  # type: ignore
 async def refine_space(
-    space_key: str, background_tasks: BackgroundTasks
+    request: Request,
+    space_key: str,
+    background_tasks: BackgroundTasks,
+    api_key: str = Depends(get_api_key),
 ) -> Dict[str, Any]:
     """Start the refinement process for an entire Confluence space."""
     background_tasks.add_task(process_space_refinement, space_key)
@@ -188,7 +250,10 @@ async def refine_space(
 
 
 @app.get("/status/{job_id}", response_model=RefinementJob)
-async def get_job_status(job_id: str) -> RefinementJob:
+@limiter.limit("60/minute")  # type: ignore
+async def get_job_status(
+    request: Request, job_id: str, api_key: str = Depends(get_api_key)
+) -> RefinementJob:
     """Check the status of a specific refinement job."""
     job = await get_job(job_id)
     if not job:
@@ -197,7 +262,10 @@ async def get_job_status(job_id: str) -> RefinementJob:
 
 
 @app.post("/publish/{job_id}", status_code=status.HTTP_200_OK)
-async def publish_page(job_id: str) -> Dict[str, Any]:
+@limiter.limit("5/minute")  # type: ignore
+async def publish_page(
+    request: Request, job_id: str, api_key: str = Depends(get_api_key)
+) -> Dict[str, Any]:
     """Publish a refined page back to Confluence."""
     job = await get_job(job_id)
     if not job:
