@@ -30,13 +30,13 @@ async def generate_response(
     """Helper function to generate a response from OpenAI's Chat API.
 
     Args:
-        prompt (str): The user prompt to send to the model.
-        system_prompt (str): The system instruction prompt.
-        model (str): The LLM model to use.
-        temperature (float): The generation temperature.
+        prompt: The user prompt to send to the model.
+        system_prompt: The system instruction prompt.
+        model: The LLM model to use.
+        temperature: The generation temperature.
 
     Returns:
-        str: The generated response as a string.
+        The generated response as a string.
     """
     client = _get_client()
     if client is None:

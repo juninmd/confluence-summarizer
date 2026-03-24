@@ -12,11 +12,11 @@ async def analyze_content(original_text: str, context: List[str]) -> AnalysisRes
     """Analyze the content against the given context to identify flaws.
 
     Args:
-        original_text (str): The original Confluence documentation text.
-        context (List[str]): Context text retrieved from the vector database.
+        original_text: The original Confluence documentation text.
+        context: Context text retrieved from the vector database.
 
     Returns:
-        AnalysisResult: An AnalysisResult object containing the generated critiques.
+        An AnalysisResult object containing the generated critiques.
     """
 
     system_prompt = (
