@@ -28,7 +28,11 @@ def init_db() -> None:
 
 
 def save_job_sync(job: RefinementJob) -> None:
-    """Save a job to the database synchronously."""
+    """Save a job to the database synchronously.
+
+    Args:
+        job (RefinementJob): The refinement job object to save.
+    """
     with sqlite3.connect(settings.DB_PATH) as conn:
         conn.execute(
             """
@@ -53,7 +57,14 @@ def save_job_sync(job: RefinementJob) -> None:
 
 
 def get_job_sync(job_id: str) -> Optional[RefinementJob]:
-    """Retrieve a job from the database synchronously."""
+    """Retrieve a job from the database synchronously.
+
+    Args:
+        job_id: The ID of the job to retrieve.
+
+    Returns:
+        The job data if found, or None.
+    """
     with sqlite3.connect(settings.DB_PATH) as conn:
         cursor = conn.execute(
             "SELECT id, page_id, status, error, original_text, refined_text FROM jobs WHERE id = ?",
@@ -73,10 +84,21 @@ def get_job_sync(job_id: str) -> Optional[RefinementJob]:
 
 
 async def save_job(job: RefinementJob) -> None:
-    """Save a job asynchronously using asyncio.to_thread."""
+    """Save a job asynchronously using asyncio.to_thread.
+
+    Args:
+        job: The refinement job object to save.
+    """
     await asyncio.to_thread(save_job_sync, job)
 
 
 async def get_job(job_id: str) -> Optional[RefinementJob]:
-    """Get a job asynchronously using asyncio.to_thread."""
+    """Get a job asynchronously using asyncio.to_thread.
+
+    Args:
+        job_id: The ID of the job to retrieve.
+
+    Returns:
+        The job data if found, or None.
+    """
     return await asyncio.to_thread(get_job_sync, job_id)

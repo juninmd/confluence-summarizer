@@ -109,7 +109,12 @@ async def get_api_key(api_key_header: str | None = Security(api_key_header)) -> 
 
 
 async def _perform_refinement(job: RefinementJob, page: ConfluencePage):
-    """Core logic to refine a single Confluence page."""
+    """Core logic to refine a single Confluence page.
+
+    Args:
+        job (RefinementJob): The refinement job to process.
+        page (ConfluencePage): The original Confluence page to refine.
+    """
     try:
         # Step 1: Query Context
         logger.info(f"Querying context for job {job.id}")
@@ -150,7 +155,11 @@ async def _perform_refinement(job: RefinementJob, page: ConfluencePage):
 
 
 async def process_refinement_job(job: RefinementJob):
-    """Background task to run a single refinement job with semaphore."""
+    """Background task to run a single refinement job with semaphore.
+
+    Args:
+        job: The refinement job to process.
+    """
     async with refinement_semaphore:
         try:
             logger.info(
@@ -170,7 +179,11 @@ async def process_refinement_job(job: RefinementJob):
 
 
 async def process_space_refinement(space_key: str):
-    """Background task to process an entire Confluence space."""
+    """Background task to process an entire Confluence space.
+
+    Args:
+        space_key: The space key to process.
+    """
     try:
         logger.info(f"Starting space processing for space: {space_key}")
         pages = await confluence.get_pages_from_space(space_key)
@@ -227,7 +240,17 @@ async def refine_page(
     background_tasks: BackgroundTasks,
     api_key: str = Depends(get_api_key),
 ) -> Dict[str, Any]:
-    """Start the refinement process for a single Confluence page."""
+    """Start the refinement process for a single Confluence page.
+
+    Args:
+        request: The incoming request object.
+        page_id: The ID of the page to refine.
+        background_tasks: FastAPI background tasks dependency.
+        api_key: The authenticated API key.
+
+    Returns:
+        A dictionary with the acceptance message and job ID.
+    """
     job_id = str(uuid.uuid4())
     job = RefinementJob(id=job_id, page_id=page_id, status=RefinementStatus.PENDING)
     await save_job(job)
@@ -244,7 +267,17 @@ async def refine_space(
     background_tasks: BackgroundTasks,
     api_key: str = Depends(get_api_key),
 ) -> Dict[str, Any]:
-    """Start the refinement process for an entire Confluence space."""
+    """Start the refinement process for an entire Confluence space.
+
+    Args:
+        request: The incoming request object.
+        space_key: The key of the space to refine.
+        background_tasks: FastAPI background tasks dependency.
+        api_key: The authenticated API key.
+
+    Returns:
+        A dictionary with the acceptance message and space key.
+    """
     background_tasks.add_task(process_space_refinement, space_key)
     return {"message": "Space refinement job accepted", "space_key": space_key}
 
@@ -254,7 +287,19 @@ async def refine_space(
 async def get_job_status(
     request: Request, job_id: str, api_key: str = Depends(get_api_key)
 ) -> RefinementJob:
-    """Check the status of a specific refinement job."""
+    """Check the status of a specific refinement job.
+
+    Args:
+        request: The incoming request object.
+        job_id: The ID of the job to check.
+        api_key: The authenticated API key.
+
+    Returns:
+        The job data.
+
+    Raises:
+        HTTPException: If the job is not found.
+    """
     job = await get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -266,7 +311,19 @@ async def get_job_status(
 async def publish_page(
     request: Request, job_id: str, api_key: str = Depends(get_api_key)
 ) -> Dict[str, Any]:
-    """Publish a refined page back to Confluence."""
+    """Publish a refined page back to Confluence.
+
+    Args:
+        request: The incoming request object.
+        job_id: The ID of the refinement job to publish.
+        api_key: The authenticated API key.
+
+    Returns:
+        A dictionary with a success message.
+
+    Raises:
+        HTTPException: If the job is not found, not complete, or publishing fails.
+    """
     job = await get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
