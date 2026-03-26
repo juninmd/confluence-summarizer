@@ -157,7 +157,6 @@ async def get_pages_from_space(
     retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
 )
 async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
-async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
     """Publish a new version of the page back to Confluence.
 
     Args:
