@@ -65,7 +65,6 @@ async def lifespan(app: FastAPI):
 # Configure Rate Limiter Backend
 if settings.REDIS_URL:
     logger.info("Using Redis backend for rate limiting.")
-    storage = RedisStorage(settings.REDIS_URL)
     limiter = Limiter(key_func=get_remote_address, storage_uri=settings.REDIS_URL)
 else:
     logger.info("Using in-memory backend for rate limiting.")
