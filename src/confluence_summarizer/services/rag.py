@@ -1,8 +1,11 @@
 import asyncio
+import hashlib
+import json
 import logging
 from typing import Any, List
 
 import chromadb
+import redis.asyncio as redis
 from chromadb.config import Settings as ChromaSettings
 
 from src.confluence_summarizer.config import settings
@@ -12,6 +15,14 @@ logger = logging.getLogger(__name__)
 
 _chroma_client = None
 _collection = None
+_redis_client: redis.Redis | None = None  # type: ignore
+
+
+def _get_redis() -> redis.Redis | None:  # type: ignore
+    global _redis_client
+    if settings.REDIS_URL and _redis_client is None:
+        _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return _redis_client
 
 
 def _get_collection() -> Any:
@@ -127,7 +138,7 @@ def _query_context(query_text: str, n_results: int = 5) -> List[str]:
 
 
 async def query_context(query_text: str, n_results: int = 5) -> List[str]:
-    """Asynchronously query context from ChromaDB using a thread pool.
+    """Asynchronously query context from ChromaDB using a thread pool and Redis cache.
 
     Args:
         query_text: The text query to search for.
@@ -136,4 +147,30 @@ async def query_context(query_text: str, n_results: int = 5) -> List[str]:
     Returns:
         A list of matching documents.
     """
-    return await asyncio.to_thread(_query_context, query_text, n_results)
+    cache_key = ""
+    r_client = _get_redis()
+
+    if r_client:
+        # Create a unique key for the query
+        query_hash = hashlib.md5(
+            f"{query_text}:{n_results}".encode("utf-8")
+        ).hexdigest()
+        cache_key = f"rag:query:{query_hash}"
+        try:
+            cached_result = await r_client.get(cache_key)
+            if cached_result:
+                return json.loads(cached_result)  # type: ignore
+        except Exception as e:
+            logger.warning(f"Redis cache get failed: {e}")
+
+    # Not in cache or cache disabled, query ChromaDB
+    result = await asyncio.to_thread(_query_context, query_text, n_results)
+
+    if r_client and result:
+        try:
+            # Cache for 1 hour (3600 seconds)
+            await r_client.setex(cache_key, 3600, json.dumps(result))
+        except Exception as e:
+            logger.warning(f"Redis cache set failed: {e}")
+
+    return result  # type: ignore

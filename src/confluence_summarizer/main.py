@@ -20,6 +20,7 @@ from fastapi.security import APIKeyHeader
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from limits.storage import RedisStorage
 
 from src.confluence_summarizer.config import settings
 from src.confluence_summarizer.database import get_job, init_db, save_job
@@ -61,7 +62,15 @@ async def lifespan(app: FastAPI):
     await confluence.close_client()
 
 
-limiter = Limiter(key_func=get_remote_address)
+# Configure Rate Limiter Backend
+if settings.REDIS_URL:
+    logger.info("Using Redis backend for rate limiting.")
+    storage = RedisStorage(settings.REDIS_URL)
+    limiter = Limiter(key_func=get_remote_address, storage_uri=settings.REDIS_URL)
+else:
+    logger.info("Using in-memory backend for rate limiting.")
+    limiter = Limiter(key_func=get_remote_address)
+
 
 app = FastAPI(
     title="Confluence Summarizer",

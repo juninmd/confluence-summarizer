@@ -35,6 +35,7 @@ This system connects to Confluence, ingests pages into a vector database (Chroma
 - The Confluence pagination now supports fetching all pages by default (`limit=None`) while keeping bounded API page size (`page_size <= 50`).
 - Space ingestion/refinement use bounded concurrency (`asyncio.Semaphore`) to prevent API overload and improve throughput.
 - Reused shared `httpx.AsyncClient` connection pool (initialized in app lifespan) for lower request overhead.
+- Redis integration for distributed rate limiting and RAG query results caching.
 
 ## Setup
 
@@ -52,6 +53,7 @@ This system connects to Confluence, ingests pages into a vector database (Chroma
    OPENAI_API_KEY=sk-...
    CHROMA_DB_PATH=./chroma_db
    DB_PATH=jobs.db
+   REDIS_URL=redis://localhost:6379/0  # Optional: For Rate Limiting & RAG Cache
    ```
 
 3. **Run the API**:

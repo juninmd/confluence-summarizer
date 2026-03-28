@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     REFINEMENT_CONCURRENCY: int = 5
     APP_API_KEY: str
     ALLOWED_ORIGINS: list[str] = []
+    REDIS_URL: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env")
 
