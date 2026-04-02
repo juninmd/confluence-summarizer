@@ -62,12 +62,12 @@ However, we are currently blocked by CI pipeline instability which needs immedia
 ### Feature: CI Pipeline Stabilization & Core Merge
 *   **User Value Proposition:** Ensures that all code changes are reliably tested and validated, allowing for a stable and predictable release cadence.
 *   **Technical Approach:** Investigate failing GitHub Actions workflows (Issues #55, #58), fix underlying environment or test issues, and successfully merge PR #44.
-*   **Success Criteria:** CI pipeline passes 100% consistently on `master` and all open PRs.
+*   **Success Criteria:** CI pipeline passes 100% consistently on the default branch (e.g., main) and all open PRs.
 *   **Estimated Effort:** Small
 
 ### Feature: Reliable Confluence Publishing Mechanism
 *   **User Value Proposition:** Closes the loop by automatically pushing polished content back to Confluence, realizing the time-saving benefits of the automated pipeline.
-*   **Technical Approach:** Use the Confluence API to update pages. Implement validation to ensure complex Confluence storage format (macros, tables) is not corrupted during the update.
+*   **Technical Approach:** Enhance the existing Confluence API integration in src/confluence_summarizer/services/confluence.py to support reliable updates. Implement validation to ensure complex Confluence storage format (macros, tables) is not corrupted during the update.
 *   **Success Criteria:** System successfully updates 95%+ of Confluence pages without breaking their native formatting.
 *   **Estimated Effort:** Medium
 
@@ -79,7 +79,7 @@ However, we are currently blocked by CI pipeline instability which needs immedia
 
 ### Feature: Interactive Job Monitoring Web UI
 *   **User Value Proposition:** Empowers product and documentation managers to oversee the refinement process, track progress, and visually approve (diff-view) changes before publication.
-*   **Technical Approach:** Develop a lightweight React/Vue frontend interfacing with FastAPI's `/status/{job_id}`.
+*   **Technical Approach:** Develop a lightweight React/Vue frontend interfacing with FastAPI's /status/{job_id} and new endpoints for tracking space-wide refinement progress.
 *   **Success Criteria:** Users can trigger jobs, view progress bars, and approve/reject specific page updates via the UI.
 *   **Estimated Effort:** Large
 
