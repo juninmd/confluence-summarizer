@@ -5,8 +5,7 @@ import httpx
 from src.confluence_summarizer.services import confluence
 from src.confluence_summarizer.config import settings
 
-@pytest.mark.asyncio
-async def test_get_auth_success():
+def test_get_auth_success():
     old_user = settings.CONFLUENCE_USERNAME
     old_token = settings.CONFLUENCE_API_TOKEN
 
