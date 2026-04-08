@@ -224,8 +224,10 @@ def test_rag_ingest_page_delete_error():
             pass
 
     with patch("src.confluence_summarizer.services.rag._get_collection", return_value=MockCollection()):
-        # Should catch exception and not raise
-        rag._ingest_page(page)
+        with patch("src.confluence_summarizer.services.rag.logger") as mock_logger:
+            # Should catch exception and not raise
+            rag._ingest_page(page)
+            mock_logger.warning.assert_called_once()
 
 def test_rag_get_collection_init():
     import chromadb
