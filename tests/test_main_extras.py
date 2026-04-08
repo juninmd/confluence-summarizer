@@ -64,8 +64,8 @@ async def test_process_space_refinement_error_handling():
 
                     await process_space_refinement("TEST")
 
-                    # Ensure background tasks have time to execute
-                    await asyncio.sleep(0.1)
+                    # Wait for all background tasks to complete
+                    await asyncio.gather(*list(_background_tasks))
 
                     # The job should have been saved with FAILED status due to the exception
                     # First save is when creating, second is in exception block
