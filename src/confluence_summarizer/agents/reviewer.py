@@ -1,5 +1,6 @@
 import json
 
+import pydantic
 from pydantic import BaseModel, Field
 
 from src.confluence_summarizer.agents.common import (
@@ -63,7 +64,7 @@ async def review_content(
             status = RefinementStatus.PENDING
 
         return ReviewResult(status=status, feedback=data.get("feedback", ""))
-    except Exception as e:
+    except (json.JSONDecodeError, pydantic.ValidationError) as e:
         return ReviewResult(
             status=RefinementStatus.FAILED, feedback=f"Failed to parse review: {e}"
         )

@@ -1,6 +1,8 @@
 import json
 from typing import List
 
+import pydantic
+
 from src.confluence_summarizer.agents.common import (
     clean_json_response,
     generate_response,
@@ -48,6 +50,6 @@ async def analyze_content(original_text: str, context: List[str]) -> AnalysisRes
                     critique["severity"] = critique["severity"].lower()
 
         return AnalysisResult(**data)
-    except Exception:
+    except (json.JSONDecodeError, pydantic.ValidationError):
         # Fallback empty result
         return AnalysisResult(critiques=[])
