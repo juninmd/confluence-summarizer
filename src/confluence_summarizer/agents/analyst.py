@@ -50,6 +50,6 @@ async def analyze_content(original_text: str, context: List[str]) -> AnalysisRes
                     critique["severity"] = critique["severity"].lower()
 
         return AnalysisResult(**data)
-    except (json.JSONDecodeError, pydantic.ValidationError):
+    except (json.JSONDecodeError, pydantic.ValidationError, KeyError, TypeError, AttributeError):
         # Fallback empty result
         return AnalysisResult(critiques=[])
