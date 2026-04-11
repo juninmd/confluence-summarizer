@@ -146,7 +146,6 @@ async def test_reviewer_agent_handles_unknown_status():
 async def test_agents_common_missing_api_key():
     from src.confluence_summarizer.agents import common
     from src.confluence_summarizer.config import settings
-    import builtins
 
     # Force reset
     common._openai_client = None
@@ -177,6 +176,7 @@ async def test_agents_common_with_api_key():
     class MockChoice:
         class MockMessage:
             content = "Success"
+
         message = MockMessage()
 
     class MockResponse:
@@ -198,7 +198,10 @@ async def test_agents_common_with_api_key():
         assert client is not None
 
         # We need to test the generate_response directly bypassing mock patch
-        with patch("src.confluence_summarizer.agents.common._get_client", return_value=MockClient()):
+        with patch(
+            "src.confluence_summarizer.agents.common._get_client",
+            return_value=MockClient(),
+        ):
             res = await common.generate_response("prompt", "system")
             assert res == "Success"
 
@@ -213,7 +216,9 @@ async def test_agents_common_with_api_key():
 def test_rag_ingest_page_delete_error():
     from src.confluence_summarizer.models.domain import ConfluencePage
 
-    page = ConfluencePage(id="1", title="test", space_key="T", body="test body", url="x")
+    page = ConfluencePage(
+        id="1", title="test", space_key="T", body="test body", url="x"
+    )
 
     # Mock _get_collection to throw when delete is called
     class MockCollection:
@@ -223,11 +228,15 @@ def test_rag_ingest_page_delete_error():
         def add(self, documents, metadatas, ids):
             pass
 
-    with patch("src.confluence_summarizer.services.rag._get_collection", return_value=MockCollection()):
+    with patch(
+        "src.confluence_summarizer.services.rag._get_collection",
+        return_value=MockCollection(),
+    ):
         with patch("src.confluence_summarizer.services.rag.logger") as mock_logger:
             # Should catch exception and not raise
             rag._ingest_page(page)
             mock_logger.warning.assert_called_once()
+
 
 def test_rag_get_collection_init():
     import chromadb
@@ -246,6 +255,7 @@ def test_rag_get_collection_init():
     with patch.object(chromadb, "PersistentClient", return_value=MockClient()):
         col = rag_module._get_collection()
         assert isinstance(col, MockCollection)
+
 
 def test_chunk_text():
     text = "hello world this is a long text that needs to be chunked"
