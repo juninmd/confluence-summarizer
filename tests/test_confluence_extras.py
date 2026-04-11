@@ -1,9 +1,9 @@
 import pytest
-from unittest.mock import patch, AsyncMock
 import httpx
 
 from src.confluence_summarizer.services import confluence
 from src.confluence_summarizer.config import settings
+
 
 def test_get_auth_success():
     old_user = settings.CONFLUENCE_USERNAME
@@ -17,6 +17,7 @@ def test_get_auth_success():
         settings.CONFLUENCE_USERNAME = old_user
         settings.CONFLUENCE_API_TOKEN = old_token
 
+
 @pytest.mark.asyncio
 async def test_init_client_is_none():
     # Force client to None
@@ -24,6 +25,7 @@ async def test_init_client_is_none():
     await confluence.init_client()
     assert confluence._client is not None
     await confluence.close_client()
+
 
 @pytest.mark.asyncio
 async def test_init_client_not_none():
@@ -35,12 +37,14 @@ async def test_init_client_not_none():
     assert confluence._client is client_ref
     await confluence.close_client()
 
+
 @pytest.mark.asyncio
 async def test_close_client_when_not_none():
     # Create an actual AsyncClient so aclose() can be called
     confluence._client = httpx.AsyncClient()
     await confluence.close_client()
     assert confluence._client is None
+
 
 @pytest.mark.asyncio
 async def test_get_pages_from_space_with_limit(respx_mock):
@@ -49,13 +53,13 @@ async def test_get_pages_from_space_with_limit(respx_mock):
         "results": [
             {"id": "1", "title": "A", "body": {"storage": {"value": "x"}}},
             {"id": "2", "title": "B", "body": {"storage": {"value": "y"}}},
-            {"id": "3", "title": "C", "body": {"storage": {"value": "z"}}}
+            {"id": "3", "title": "C", "body": {"storage": {"value": "z"}}},
         ]
     }
 
-    respx_mock.get(f"{settings.CONFLUENCE_URL}/wiki/rest/api/content?spaceKey=TEST&expand=body.storage,version&limit=50").mock(
-        return_value=httpx.Response(200, json=mock_response)
-    )
+    respx_mock.get(
+        f"{settings.CONFLUENCE_URL}/wiki/rest/api/content?spaceKey=TEST&expand=body.storage,version&limit=50"
+    ).mock(return_value=httpx.Response(200, json=mock_response))
 
     # Force _get_client to fallback to an unmanaged client for the test
     confluence._client = None
@@ -64,6 +68,7 @@ async def test_get_pages_from_space_with_limit(respx_mock):
     assert len(pages) == 2
     assert pages[0].title == "A"
     assert pages[1].title == "B"
+
 
 @pytest.mark.asyncio
 async def test_update_page(respx_mock):
