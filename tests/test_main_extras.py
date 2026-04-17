@@ -2,7 +2,8 @@ import pytest
 from unittest.mock import patch, AsyncMock
 from fastapi import HTTPException, status
 
-from src.confluence_summarizer.main import app, lifespan, get_api_key
+from src.confluence_summarizer.deps import get_api_key
+from src.confluence_summarizer.main import app, lifespan
 from src.confluence_summarizer.models.domain import (
     ConfluencePage,
     RefinementStatus,
@@ -47,12 +48,10 @@ async def test_get_api_key_invalid():
 @pytest.mark.asyncio
 async def test_process_with_page_exception():
     with patch(
-        "src.confluence_summarizer.main._perform_refinement",
+        "src.confluence_summarizer.tasks._perform_refinement",
         side_effect=Exception("mocked failure"),
     ):
-        with patch(
-            "src.confluence_summarizer.main.save_job", new_callable=AsyncMock
-        ):
+        with patch("src.confluence_summarizer.tasks.save_job", new_callable=AsyncMock):
             # _process_with_page is inside process_space_refinement, need to trigger it directly
             # by importing the nested function... but nested functions are hard to mock.
             # Instead we mock `_perform_refinement` and just trigger a space refinement.
@@ -79,22 +78,22 @@ async def test_process_space_refinement_error_handling():
             "src.confluence_summarizer.services.rag.ingest_page", new_callable=AsyncMock
         ):
             with patch(
-                "src.confluence_summarizer.main._perform_refinement",
+                "src.confluence_summarizer.tasks._perform_refinement",
                 side_effect=Exception("test failure"),
             ):
                 with patch(
-                    "src.confluence_summarizer.main.save_job", new_callable=AsyncMock
+                    "src.confluence_summarizer.tasks.save_job", new_callable=AsyncMock
                 ) as mock_save:
-                    from src.confluence_summarizer.main import (
+                    from src.confluence_summarizer.tasks import (
                         process_space_refinement,
-                        _background_tasks,
                     )
+                    from src.confluence_summarizer.deps import background_tasks_set
                     import asyncio
 
                     await process_space_refinement("TEST")
 
                     # Wait for all background tasks to complete
-                    await asyncio.gather(*list(_background_tasks))
+                    await asyncio.gather(*list(background_tasks_set))
 
                     # The job should have been saved with FAILED status due to the exception
                     # First save is when creating, second is in exception block
