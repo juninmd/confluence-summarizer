@@ -36,7 +36,7 @@ def mock_confluence_client():
 async def test_refine_page_endpoint(mock_confluence_client):
     # Mocking background tasks to not actually run for the endpoint test
     with patch(
-        "src.confluence_summarizer.main.BackgroundTasks.add_task"
+        "src.confluence_summarizer.routes.BackgroundTasks.add_task"
     ) as mock_add_task:
         response = client.post(
             "/refine/test-page-id", headers={"X-API-Key": "dummy-api-key"}
@@ -55,7 +55,7 @@ async def test_refine_page_endpoint(mock_confluence_client):
 @pytest.mark.asyncio
 async def test_refine_space_endpoint():
     with patch(
-        "src.confluence_summarizer.main.BackgroundTasks.add_task"
+        "src.confluence_summarizer.routes.BackgroundTasks.add_task"
     ) as mock_add_task:
         response = client.post(
             "/refine/space/TESTSPACE", headers={"X-API-Key": "dummy-api-key"}

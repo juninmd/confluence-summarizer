@@ -4,7 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from src.confluence_summarizer.main import _perform_refinement, process_space_refinement
+from src.confluence_summarizer.tasks import (
+    _perform_refinement,
+    process_space_refinement,
+)
 from src.confluence_summarizer.models.domain import (
     ConfluencePage,
     RefinementJob,

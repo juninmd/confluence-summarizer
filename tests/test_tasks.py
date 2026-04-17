@@ -7,9 +7,9 @@ from fastapi.testclient import TestClient
 from src.confluence_summarizer import config
 from src.confluence_summarizer.agents.reviewer import ReviewResult
 from src.confluence_summarizer.database import init_db, save_job_sync
-from src.confluence_summarizer.main import (
+from src.confluence_summarizer.main import app
+from src.confluence_summarizer.tasks import (
     _perform_refinement,
-    app,
     process_refinement_job,
     process_space_refinement,
 )
@@ -174,7 +174,8 @@ async def test_process_refinement_job_success():
     ) as mock_get_page:
         mock_get_page.return_value = page
         with patch(
-            "src.confluence_summarizer.main._perform_refinement", new_callable=AsyncMock
+            "src.confluence_summarizer.tasks._perform_refinement",
+            new_callable=AsyncMock,
         ) as mock_perform:
             await process_refinement_job(job)
             assert mock_perform.called
