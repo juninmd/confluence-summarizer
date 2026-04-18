@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     )
     CHROMA_DB_PATH: str = "chroma_db"
     DB_PATH: str = "jobs.db"
+    REDIS_URL: str | None = None
     INGESTION_CONCURRENCY: int = 10
     REFINEMENT_CONCURRENCY: int = 5
     APP_API_KEY: str
