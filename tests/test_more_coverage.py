@@ -122,3 +122,86 @@ async def test_update_page_failure(mock_chroma):
 
         with pytest.raises(RetryError):
             await confluence.update_page("1", "T", "B", 2)
+
+
+@pytest.mark.asyncio
+async def test_rag_query_context_redis_cache():
+    with patch("src.confluence_summarizer.services.rag._get_redis") as mock_get_redis:
+        mock_redis = AsyncMock()
+        mock_get_redis.return_value = mock_redis
+
+        # Test Cache Hit
+        mock_redis.get.return_value = '["doc1_cached"]'
+        results = await rag.query_context("query_hit")
+        assert results == ["doc1_cached"]
+        assert mock_redis.get.called
+
+        # Test Cache Miss and Write
+        mock_redis.reset_mock()
+        mock_redis.get.return_value = None
+        with patch(
+            "src.confluence_summarizer.services.rag._query_context"
+        ) as mock_query:
+            mock_query.return_value = ["doc1_db"]
+            results = await rag.query_context("query_miss")
+            assert results == ["doc1_db"]
+            assert mock_redis.get.called
+            assert mock_redis.setex.called
+
+
+@pytest.mark.asyncio
+async def test_get_redis_client():
+    from src.confluence_summarizer.config import settings
+
+    original_url = settings.REDIS_URL
+
+    try:
+        # Ensure it handles REDIS_URL properly
+        with patch("redis.asyncio.from_url") as mock_from_url:
+            settings.REDIS_URL = "redis://localhost:6379"
+
+            # Clear global to test initialization
+            import src.confluence_summarizer.services.rag as rag_module
+
+            rag_module._redis_client = None
+
+            client = rag_module._get_redis()
+            assert client is not None
+            assert mock_from_url.called
+
+    finally:
+        # Cleanup
+        import src.confluence_summarizer.services.rag as rag_module
+
+        settings.REDIS_URL = original_url
+        rag_module._redis_client = None
+
+
+@pytest.mark.asyncio
+async def test_rag_query_context_redis_cache_exceptions():
+    with patch("src.confluence_summarizer.services.rag._get_redis") as mock_get_redis:
+        mock_redis = AsyncMock()
+        mock_get_redis.return_value = mock_redis
+
+        # Test Cache Read Exception
+        mock_redis.get.side_effect = Exception("Redis Read Error")
+        with patch(
+            "src.confluence_summarizer.services.rag._query_context"
+        ) as mock_query:
+            mock_query.return_value = ["doc1_db"]
+            results = await rag.query_context("query_read_err")
+            assert results == ["doc1_db"]
+            assert mock_redis.get.called
+
+        # Test Cache Write Exception
+        mock_redis.reset_mock()
+        mock_redis.get.side_effect = None
+        mock_redis.get.return_value = None
+        mock_redis.setex.side_effect = Exception("Redis Write Error")
+        with patch(
+            "src.confluence_summarizer.services.rag._query_context"
+        ) as mock_query:
+            mock_query.return_value = ["doc1_db"]
+            results = await rag.query_context("query_write_err")
+            assert results == ["doc1_db"]
+            assert mock_redis.setex.called
