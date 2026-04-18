@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 _chroma_client = None
 _collection = None
-_redis_client: Optional[redis.Redis] = None
+_redis_client: Optional[redis.Redis] = None  # type: ignore
 
 
-def _get_redis() -> Optional[redis.Redis]:
+def _get_redis() -> Optional[redis.Redis]:  # type: ignore
     global _redis_client
     if _redis_client is None and settings.REDIS_URL:
         _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -148,25 +148,25 @@ async def query_context(query_text: str, n_results: int = 5) -> List[str]:
         A list of matching documents.
     """
     redis_client = _get_redis()
-    cache_key = None
+    cache_key: Optional[str] = None
 
     if redis_client:
-        query_hash = hashlib.md5(query_text.encode("utf-8")).hexdigest()
+        query_hash = hashlib.sha256(query_text.encode("utf-8")).hexdigest()
         cache_key = f"rag_query:{query_hash}:{n_results}"
         try:
             cached_result = await redis_client.get(cache_key)
             if cached_result:
                 logger.info(f"RAG cache hit for query hash {query_hash}")
-                return json.loads(cached_result)
+                return cast(List[str], json.loads(cached_result))
         except Exception as e:
             logger.warning(f"Redis cache read error: {e}")
 
     # Fallback to database
     results = await asyncio.to_thread(_query_context, query_text, n_results)
 
-    if redis_client and cache_key and results:
+    if redis_client and cache_key is not None:
         try:
-            # Cache for 1 hour
+            # Cache for 1 hour, even empty results
             await redis_client.setex(cache_key, 3600, json.dumps(results))
         except Exception as e:
             logger.warning(f"Redis cache write error: {e}")

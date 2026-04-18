@@ -153,21 +153,27 @@ async def test_rag_query_context_redis_cache():
 async def test_get_redis_client():
     from src.confluence_summarizer.config import settings
 
-    # Ensure it handles REDIS_URL properly
-    with patch("redis.asyncio.from_url") as mock_from_url:
-        settings.REDIS_URL = "redis://localhost:6379"
+    original_url = settings.REDIS_URL
 
-        # Clear global to test initialization
+    try:
+        # Ensure it handles REDIS_URL properly
+        with patch("redis.asyncio.from_url") as mock_from_url:
+            settings.REDIS_URL = "redis://localhost:6379"
+
+            # Clear global to test initialization
+            import src.confluence_summarizer.services.rag as rag_module
+
+            rag_module._redis_client = None
+
+            client = rag_module._get_redis()
+            assert client is not None
+            assert mock_from_url.called
+
+    finally:
+        # Cleanup
         import src.confluence_summarizer.services.rag as rag_module
 
-        rag_module._redis_client = None
-
-        client = rag_module._get_redis()
-        assert client is not None
-        assert mock_from_url.called
-
-        # Cleanup
-        settings.REDIS_URL = None
+        settings.REDIS_URL = original_url
         rag_module._redis_client = None
 
 
