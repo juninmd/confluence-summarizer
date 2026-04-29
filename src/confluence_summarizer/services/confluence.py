@@ -1,4 +1,5 @@
 import logging
+import urllib.parse
 from typing import Any, List, Optional
 
 import httpx
@@ -71,8 +72,9 @@ def clean_html(html_content: str) -> str:
 async def get_page(page_id: str) -> ConfluencePage:
     client = _get_client()
     # Confluence API v1 to ensure space_key is available as expected
+    safe_page_id = urllib.parse.quote(page_id)
     response = await client.get(
-        f"/wiki/rest/api/content/{page_id}?expand=body.storage,space"
+        f"/wiki/rest/api/content/{safe_page_id}?expand=body.storage,space"
     )
     response.raise_for_status()
     data = response.json()
@@ -110,7 +112,8 @@ async def get_pages_from_space(
     client = _get_client()
     pages: List[ConfluencePage] = []
 
-    url = f"/wiki/rest/api/content?spaceKey={space_key}&expand=body.storage,version&limit={page_size}"
+    safe_space_key = urllib.parse.quote(space_key)
+    url = f"/wiki/rest/api/content?spaceKey={safe_space_key}&expand=body.storage,version&limit={page_size}"
 
     while url:
         response = await client.get(url)
@@ -177,6 +180,7 @@ async def update_page(page_id: str, title: str, body: str, version_number: int) 
         "version": {"number": version_number},
     }
     # Using v2 API for updates
-    response = await client.put(f"/wiki/api/v2/pages/{page_id}", json=payload)
+    safe_page_id = urllib.parse.quote(page_id)
+    response = await client.put(f"/wiki/api/v2/pages/{safe_page_id}", json=payload)
     response.raise_for_status()
     return response.json()

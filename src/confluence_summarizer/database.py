@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import sqlite3
-from typing import Optional
+from typing import List, Optional
 
 from src.confluence_summarizer.config import settings
 from src.confluence_summarizer.models.domain import RefinementJob, RefinementStatus
@@ -56,6 +56,38 @@ def save_job_sync(job: RefinementJob) -> None:
         conn.commit()
 
 
+def save_jobs_bulk_sync(jobs: List[RefinementJob]) -> None:
+    """Save multiple jobs to the database synchronously using a bulk operation.
+
+    Args:
+        jobs (List[RefinementJob]): The list of refinement job objects to save.
+    """
+    with sqlite3.connect(settings.DB_PATH) as conn:
+        conn.executemany(
+            """
+            INSERT INTO jobs (id, page_id, status, error, original_text, refined_text)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                status=excluded.status,
+                error=excluded.error,
+                original_text=excluded.original_text,
+                refined_text=excluded.refined_text
+            """,
+            [
+                (
+                    job.id,
+                    job.page_id,
+                    job.status.value,
+                    job.error,
+                    job.original_text,
+                    job.refined_text,
+                )
+                for job in jobs
+            ],
+        )
+        conn.commit()
+
+
 def get_job_sync(job_id: str) -> Optional[RefinementJob]:
     """Retrieve a job from the database synchronously.
 
@@ -102,3 +134,12 @@ async def get_job(job_id: str) -> Optional[RefinementJob]:
         The job data if found, or None.
     """
     return await asyncio.to_thread(get_job_sync, job_id)
+
+
+async def save_jobs_bulk(jobs: List[RefinementJob]) -> None:
+    """Save multiple jobs asynchronously using asyncio.to_thread.
+
+    Args:
+        jobs: The list of refinement job objects to save.
+    """
+    await asyncio.to_thread(save_jobs_bulk_sync, jobs)

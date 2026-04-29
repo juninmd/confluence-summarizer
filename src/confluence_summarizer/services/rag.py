@@ -5,6 +5,7 @@ import logging
 from typing import Any, List, Optional, cast
 
 import chromadb
+from chromadb.api.types import Metadata
 from chromadb.config import Settings as ChromaSettings
 import redis.asyncio as redis
 
@@ -93,7 +94,7 @@ def _ingest_page(page: ConfluencePage) -> None:
         return
 
     ids = [f"{page.id}_chunk_{i}" for i in range(len(chunks))]
-    metadatas: List[Any] = [
+    metadatas: List[Metadata] = [
         {
             "page_id": str(page.id),
             "title": str(page.title),
@@ -104,7 +105,7 @@ def _ingest_page(page: ConfluencePage) -> None:
     ]
 
     # Type hinting workaround for ChromaDB metadatas
-    col.add(documents=chunks, metadatas=metadatas, ids=ids)  # type: ignore
+    col.add(documents=chunks, metadatas=metadatas, ids=ids)
 
 
 async def ingest_page(page: ConfluencePage) -> None:
