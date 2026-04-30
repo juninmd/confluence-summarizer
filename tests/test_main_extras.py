@@ -82,22 +82,27 @@ async def test_process_space_refinement_error_handling():
                 side_effect=Exception("test failure"),
             ):
                 with patch(
-                    "src.confluence_summarizer.tasks.save_job", new_callable=AsyncMock
-                ) as mock_save:
-                    from src.confluence_summarizer.tasks import (
-                        process_space_refinement,
-                    )
-                    from src.confluence_summarizer.deps import background_tasks_set
-                    import asyncio
+                    "src.confluence_summarizer.tasks.save_jobs_bulk",
+                    new_callable=AsyncMock,
+                ) as mock_save_bulk:
+                    with patch(
+                        "src.confluence_summarizer.tasks.save_job",
+                        new_callable=AsyncMock,
+                    ) as mock_save:
+                        from src.confluence_summarizer.tasks import (
+                            process_space_refinement,
+                        )
+                        from src.confluence_summarizer.deps import background_tasks_set
+                        import asyncio
 
-                    await process_space_refinement("TEST")
+                        await process_space_refinement("TEST")
 
-                    # Wait for all background tasks to complete
-                    await asyncio.gather(*list(background_tasks_set))
+                        # Wait for all background tasks to complete
+                        await asyncio.gather(*list(background_tasks_set))
 
-                    # The job should have been saved with FAILED status due to the exception
-                    # First save is when creating, second is in exception block
-                    assert mock_save.call_count >= 2
-                    last_saved_job = mock_save.call_args_list[-1][0][0]
-                    assert last_saved_job.status == RefinementStatus.FAILED
-                    assert "test failure" in last_saved_job.error
+                        # The job should have been bulk saved when creating, and normal saved in exception block
+                        assert mock_save_bulk.call_count == 1
+                        assert mock_save.call_count >= 1
+                        last_saved_job = mock_save.call_args_list[-1][0][0]
+                        assert last_saved_job.status == RefinementStatus.FAILED
+                        assert "test failure" in last_saved_job.error
