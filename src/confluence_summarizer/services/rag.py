@@ -5,9 +5,9 @@ import logging
 from typing import Any, List, Optional, cast
 
 import chromadb
+import redis.asyncio as redis
 from chromadb.api.types import Metadata
 from chromadb.config import Settings as ChromaSettings
-import redis.asyncio as redis
 
 from src.confluence_summarizer.config import settings
 from src.confluence_summarizer.models.domain import ConfluencePage

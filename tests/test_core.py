@@ -240,6 +240,7 @@ def test_rag_ingest_page_delete_error():
 
 def test_rag_get_collection_init():
     import chromadb
+
     import src.confluence_summarizer.services.rag as rag_module
 
     rag_module._chroma_client = None
