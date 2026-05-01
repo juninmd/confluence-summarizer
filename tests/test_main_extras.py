@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
 from fastapi import HTTPException, status
 
 from src.confluence_summarizer.deps import get_api_key
@@ -89,11 +90,12 @@ async def test_process_space_refinement_error_handling():
                         "src.confluence_summarizer.tasks.save_job",
                         new_callable=AsyncMock,
                     ) as mock_save:
+                        import asyncio
+
+                        from src.confluence_summarizer.deps import background_tasks_set
                         from src.confluence_summarizer.tasks import (
                             process_space_refinement,
                         )
-                        from src.confluence_summarizer.deps import background_tasks_set
-                        import asyncio
 
                         await process_space_refinement("TEST")
 

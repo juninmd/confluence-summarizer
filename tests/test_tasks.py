@@ -8,11 +8,6 @@ from src.confluence_summarizer import config
 from src.confluence_summarizer.agents.reviewer import ReviewResult
 from src.confluence_summarizer.database import init_db, save_job_sync
 from src.confluence_summarizer.main import app
-from src.confluence_summarizer.tasks import (
-    _perform_refinement,
-    process_refinement_job,
-    process_space_refinement,
-)
 from src.confluence_summarizer.models.domain import (
     AnalysisResult,
     ConfluencePage,
@@ -20,6 +15,11 @@ from src.confluence_summarizer.models.domain import (
     CritiqueSeverity,
     RefinementJob,
     RefinementStatus,
+)
+from src.confluence_summarizer.tasks import (
+    _perform_refinement,
+    process_refinement_job,
+    process_space_refinement,
 )
 
 client = TestClient(app)
@@ -286,3 +286,25 @@ async def test_publish_page_failure():
         )
         assert response.status_code == 500
         assert "Publishing failed" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_process_space_refinement_ingestion_error():
+    page = ConfluencePage(id="page1", title="Title", space_key="SPACE", body="Text")
+
+    with (
+        patch(
+            "src.confluence_summarizer.services.confluence.get_pages_from_space",
+            new_callable=AsyncMock,
+        ) as mock_get_pages,
+        patch(
+            "src.confluence_summarizer.services.rag.ingest_page", new_callable=AsyncMock
+        ) as mock_ingest,
+    ):
+        mock_get_pages.return_value = [page]
+        mock_ingest.side_effect = Exception("Ingestion failed")
+
+        await process_space_refinement("SPACE")
+
+        assert mock_get_pages.called
+        assert mock_ingest.called
