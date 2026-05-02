@@ -32,7 +32,17 @@ def save_job_sync(job: RefinementJob) -> None:
 
     Args:
         job (RefinementJob): The refinement job object to save.
+
+    Raises:
+        ValueError: If id, page_id or status are missing or invalid.
     """
+    if not job.id:
+        raise ValueError("Job id is required")
+    if not job.page_id:
+        raise ValueError("Job page_id is required")
+    if not job.status or type(job.status) is not RefinementStatus:
+        raise ValueError("Job status must be a valid RefinementStatus")
+
     with sqlite3.connect(settings.DB_PATH) as conn:
         conn.execute(
             """
