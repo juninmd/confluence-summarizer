@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     APP_API_KEY: str
     ALLOWED_ORIGINS: list[str] = []
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file="secrets/.env")
 
 
 # For tests or default load, provide empty defaults

@@ -13,7 +13,7 @@ from src.confluence_summarizer.deps import limiter
 from src.confluence_summarizer.routes import router
 from src.confluence_summarizer.services import confluence
 
-load_dotenv()
+load_dotenv("secrets/.env")
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

@@ -17,7 +17,10 @@ def _get_client() -> Optional[AsyncOpenAI]:
         if not settings.OPENAI_API_KEY:
             logger.warning("OPENAI_API_KEY not set. LLM capabilities will be disabled.")
             return None
-        _openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        _openai_client = AsyncOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            max_retries=2,
+        )
     return _openai_client
 
 
