@@ -44,7 +44,7 @@ This system connects to Confluence, ingests pages into a vector database (Chroma
    ```
 
 2. **Environment Variables**:
-   Create a `.env` file:
+   Create a `.env` file inside a `secrets` directory (e.g., `secrets/.env`):
    ```env
    CONFLUENCE_URL=https://your-domain.atlassian.net/wiki
    CONFLUENCE_USERNAME=your-email@example.com

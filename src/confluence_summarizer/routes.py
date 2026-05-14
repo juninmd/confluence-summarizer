@@ -15,7 +15,7 @@ from src.confluence_summarizer.tasks import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_api_key)])
 
 
 @router.post("/refine/{page_id}", status_code=status.HTTP_202_ACCEPTED)
@@ -24,7 +24,6 @@ async def refine_page(
     request: Request,
     page_id: str,
     background_tasks: BackgroundTasks,
-    api_key: str = Depends(get_api_key),
 ) -> Dict[str, Any]:
     """Start the refinement process for a single Confluence page.
 
@@ -51,7 +50,6 @@ async def refine_space(
     request: Request,
     space_key: str,
     background_tasks: BackgroundTasks,
-    api_key: str = Depends(get_api_key),
 ) -> Dict[str, Any]:
     """Start the refinement process for an entire Confluence space.
 
@@ -71,7 +69,7 @@ async def refine_space(
 @router.get("/status/{job_id}", response_model=RefinementJob)
 @limiter.limit("60/minute")  # type: ignore
 async def get_job_status(
-    request: Request, job_id: str, api_key: str = Depends(get_api_key)
+    request: Request, job_id: str
 ) -> RefinementJob:
     """Check the status of a specific refinement job.
 
@@ -95,7 +93,7 @@ async def get_job_status(
 @router.post("/publish/{job_id}", status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")  # type: ignore
 async def publish_page(
-    request: Request, job_id: str, api_key: str = Depends(get_api_key)
+    request: Request, job_id: str
 ) -> Dict[str, Any]:
     """Publish a refined page back to Confluence.
 
