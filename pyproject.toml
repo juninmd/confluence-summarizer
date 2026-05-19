@@ -20,6 +20,7 @@ dependencies = [
     "nltk>=3.9.4",
     "requests>=2.33.0",
     "cryptography>=46.0.6",
+    "authlib>=1.6.11",
 ]
 
 [dependency-groups]
