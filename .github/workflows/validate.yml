@@ -2,12 +2,17 @@ name: Validate
 on:
   pull_request:
   push:
-    branches: [main, master]
+    branches: [master]
 concurrency:
   group: validate-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   check:
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
     uses: juninmd/base-actions/.github/workflows/reusable-validate.yml@main
+    with:
+      python-version: ${{ matrix.python-version }}
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
