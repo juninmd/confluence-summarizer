@@ -136,4 +136,4 @@ async def publish_page(
         return {"message": "Page published successfully", "page_id": job.page_id}
     except Exception as e:
         logger.exception(f"Failed to publish page for job {job_id}")
-        raise HTTPException(status_code=500, detail=f"Publishing failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Publishing failed: {e}") from e
