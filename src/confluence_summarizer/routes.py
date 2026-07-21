@@ -68,9 +68,7 @@ async def refine_space(
 
 @router.get("/status/{job_id}", response_model=RefinementJob)
 @limiter.limit("60/minute")  # type: ignore
-async def get_job_status(
-    request: Request, job_id: str
-) -> RefinementJob:
+async def get_job_status(request: Request, job_id: str) -> RefinementJob:
     """Check the status of a specific refinement job.
 
     Args:
@@ -92,9 +90,7 @@ async def get_job_status(
 
 @router.post("/publish/{job_id}", status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")  # type: ignore
-async def publish_page(
-    request: Request, job_id: str
-) -> Dict[str, Any]:
+async def publish_page(request: Request, job_id: str) -> Dict[str, Any]:
     """Publish a refined page back to Confluence.
 
     Args:
