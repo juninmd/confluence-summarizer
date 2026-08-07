@@ -25,6 +25,7 @@ dependencies = [
     "typer>=0.21.1",
     "starlette>=1.0.1",
     "chromadb==0.5.3",
+    "joserfc>=1.7.0",
 ]
 
 [dependency-groups]
