@@ -10,8 +10,8 @@ from tenacity import (
     wait_exponential,
 )
 
-from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.models.domain import ConfluencePage
+from src.config import settings
+from src.models.domain import ConfluencePage
 
 logger = logging.getLogger(__name__)
 

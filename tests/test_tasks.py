@@ -4,11 +4,11 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src.confluence_summarizer import config
-from src.confluence_summarizer.agents.reviewer import ReviewResult
-from src.confluence_summarizer.database import init_db, save_job_sync
-from src.confluence_summarizer.main import app
-from src.confluence_summarizer.models.domain import (
+from src import config
+from src.agents.reviewer import ReviewResult
+from src.database import init_db, save_job_sync
+from src.main import app
+from src.models.domain import (
     AnalysisResult,
     ConfluencePage,
     Critique,
@@ -16,7 +16,7 @@ from src.confluence_summarizer.models.domain import (
     RefinementJob,
     RefinementStatus,
 )
-from src.confluence_summarizer.tasks import (
+from src.tasks import (
     _perform_refinement,
     process_refinement_job,
     process_space_refinement,
@@ -36,7 +36,7 @@ def setup_db(tmp_path):
 def mock_confluence_client():
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     with patch(
-        "src.confluence_summarizer.services.confluence._get_client",
+        "src.services.confluence._get_client",
         return_value=mock_client,
     ):
         yield mock_client
@@ -48,11 +48,11 @@ async def test_perform_refinement_no_critiques():
     page = ConfluencePage(id="page1", title="Title", space_key="KEY", body="Text")
 
     with patch(
-        "src.confluence_summarizer.services.rag.query_context", new_callable=AsyncMock
+        "src.services.rag.query_context", new_callable=AsyncMock
     ) as mock_query:
         mock_query.return_value = []
         with patch(
-            "src.confluence_summarizer.agents.analyst.analyze_content",
+            "src.agents.analyst.analyze_content",
             new_callable=AsyncMock,
         ) as mock_analyze:
             mock_analyze.return_value = AnalysisResult(critiques=[])
@@ -78,19 +78,19 @@ async def test_perform_refinement_with_critiques():
 
     with (
         patch(
-            "src.confluence_summarizer.services.rag.query_context",
+            "src.services.rag.query_context",
             new_callable=AsyncMock,
         ) as m_query,
         patch(
-            "src.confluence_summarizer.agents.analyst.analyze_content",
+            "src.agents.analyst.analyze_content",
             new_callable=AsyncMock,
         ) as m_analyze,
         patch(
-            "src.confluence_summarizer.agents.writer.rewrite_content",
+            "src.agents.writer.rewrite_content",
             new_callable=AsyncMock,
         ) as m_rewrite,
         patch(
-            "src.confluence_summarizer.agents.reviewer.review_content",
+            "src.agents.reviewer.review_content",
             new_callable=AsyncMock,
         ) as m_review,
     ):
@@ -121,19 +121,19 @@ async def test_perform_refinement_rejected_review():
 
     with (
         patch(
-            "src.confluence_summarizer.services.rag.query_context",
+            "src.services.rag.query_context",
             new_callable=AsyncMock,
         ) as m_query,
         patch(
-            "src.confluence_summarizer.agents.analyst.analyze_content",
+            "src.agents.analyst.analyze_content",
             new_callable=AsyncMock,
         ) as m_analyze,
         patch(
-            "src.confluence_summarizer.agents.writer.rewrite_content",
+            "src.agents.writer.rewrite_content",
             new_callable=AsyncMock,
         ) as m_rewrite,
         patch(
-            "src.confluence_summarizer.agents.reviewer.review_content",
+            "src.agents.reviewer.review_content",
             new_callable=AsyncMock,
         ) as m_review,
     ):
@@ -154,7 +154,7 @@ async def test_perform_refinement_exception():
     page = ConfluencePage(id="page1", title="Title", space_key="KEY", body="Text")
 
     with patch(
-        "src.confluence_summarizer.services.rag.query_context", new_callable=AsyncMock
+        "src.services.rag.query_context", new_callable=AsyncMock
     ) as m_query:
         m_query.side_effect = Exception("RAG Failure")
         await _perform_refinement(job, page)
@@ -170,11 +170,11 @@ async def test_process_refinement_job_success():
 
     page = ConfluencePage(id="page1", title="Title", space_key="KEY", body="Text")
     with patch(
-        "src.confluence_summarizer.services.confluence.get_page", new_callable=AsyncMock
+        "src.services.confluence.get_page", new_callable=AsyncMock
     ) as mock_get_page:
         mock_get_page.return_value = page
         with patch(
-            "src.confluence_summarizer.tasks._perform_refinement",
+            "src.tasks._perform_refinement",
             new_callable=AsyncMock,
         ) as mock_perform:
             await process_refinement_job(job)
@@ -187,7 +187,7 @@ async def test_process_refinement_job_failure():
     save_job_sync(job)
 
     with patch(
-        "src.confluence_summarizer.services.confluence.get_page", new_callable=AsyncMock
+        "src.services.confluence.get_page", new_callable=AsyncMock
     ) as mock_get_page:
         mock_get_page.side_effect = Exception("API Error")
         await process_refinement_job(job)
@@ -201,11 +201,11 @@ async def test_process_space_refinement():
 
     with (
         patch(
-            "src.confluence_summarizer.services.confluence.get_pages_from_space",
+            "src.services.confluence.get_pages_from_space",
             new_callable=AsyncMock,
         ) as mock_get_pages,
         patch(
-            "src.confluence_summarizer.services.rag.ingest_page", new_callable=AsyncMock
+            "src.services.rag.ingest_page", new_callable=AsyncMock
         ) as mock_ingest,
         patch("asyncio.create_task") as mock_create_task,
     ):
@@ -230,11 +230,11 @@ async def test_publish_page_success(mock_confluence_client):
     page = ConfluencePage(id="page1", title="Title", space_key="SPACE", body="Old text")
     with (
         patch(
-            "src.confluence_summarizer.services.confluence.get_page",
+            "src.services.confluence.get_page",
             new_callable=AsyncMock,
         ) as mock_get_page,
         patch(
-            "src.confluence_summarizer.services.confluence.update_page",
+            "src.services.confluence.update_page",
             new_callable=AsyncMock,
         ) as mock_update_page,
     ):
@@ -277,7 +277,7 @@ async def test_publish_page_failure():
     save_job_sync(job)
 
     with patch(
-        "src.confluence_summarizer.services.confluence.get_page", new_callable=AsyncMock
+        "src.services.confluence.get_page", new_callable=AsyncMock
     ) as mock_get_page:
         mock_get_page.side_effect = Exception("Confluence Down")
 
@@ -294,11 +294,11 @@ async def test_process_space_refinement_ingestion_error():
 
     with (
         patch(
-            "src.confluence_summarizer.services.confluence.get_pages_from_space",
+            "src.services.confluence.get_pages_from_space",
             new_callable=AsyncMock,
         ) as mock_get_pages,
         patch(
-            "src.confluence_summarizer.services.rag.ingest_page", new_callable=AsyncMock
+            "src.services.rag.ingest_page", new_callable=AsyncMock
         ) as mock_ingest,
     ):
         mock_get_pages.return_value = [page]

@@ -2,19 +2,19 @@ import asyncio
 import logging
 import uuid
 
-from src.confluence_summarizer.agents import analyst, reviewer, writer
-from src.confluence_summarizer.database import save_job, save_jobs_bulk
-from src.confluence_summarizer.deps import (
+from src.agents import analyst, reviewer, writer
+from src.database import save_job, save_jobs_bulk
+from src.deps import (
     background_tasks_set,
     ingestion_semaphore,
     refinement_semaphore,
 )
-from src.confluence_summarizer.models.domain import (
+from src.models.domain import (
     ConfluencePage,
     RefinementJob,
     RefinementStatus,
 )
-from src.confluence_summarizer.services import confluence, rag
+from src.services import confluence, rag
 
 logger = logging.getLogger(__name__)
 

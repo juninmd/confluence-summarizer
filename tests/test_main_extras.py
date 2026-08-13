@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException, status
 
-from src.confluence_summarizer.deps import get_api_key
-from src.confluence_summarizer.main import app, lifespan
-from src.confluence_summarizer.models.domain import (
+from src.deps import get_api_key
+from src.main import app, lifespan
+from src.models.domain import (
     ConfluencePage,
     RefinementStatus,
 )
@@ -14,13 +14,13 @@ from src.confluence_summarizer.models.domain import (
 @pytest.mark.asyncio
 async def test_lifespan():
     with (
-        patch("src.confluence_summarizer.main.init_db") as mock_init_db,
+        patch("src.main.init_db") as mock_init_db,
         patch(
-            "src.confluence_summarizer.services.confluence.init_client",
+            "src.services.confluence.init_client",
             new_callable=AsyncMock,
         ) as mock_init_client,
         patch(
-            "src.confluence_summarizer.services.confluence.close_client",
+            "src.services.confluence.close_client",
             new_callable=AsyncMock,
         ) as mock_close_client,
     ):
@@ -49,10 +49,10 @@ async def test_get_api_key_invalid():
 @pytest.mark.asyncio
 async def test_process_with_page_exception():
     with patch(
-        "src.confluence_summarizer.tasks._perform_refinement",
+        "src.tasks._perform_refinement",
         side_effect=Exception("mocked failure"),
     ):
-        with patch("src.confluence_summarizer.tasks.save_job", new_callable=AsyncMock):
+        with patch("src.tasks.save_job", new_callable=AsyncMock):
             # _process_with_page is inside process_space_refinement, need to trigger it directly
             # by importing the nested function... but nested functions are hard to mock.
             # Instead we mock `_perform_refinement` and just trigger a space refinement.
@@ -67,7 +67,7 @@ async def test_process_with_page_exception():
 @pytest.mark.asyncio
 async def test_process_space_refinement_error_handling():
     with patch(
-        "src.confluence_summarizer.services.confluence.get_pages_from_space",
+        "src.services.confluence.get_pages_from_space",
         new_callable=AsyncMock,
     ) as mock_get:
         page = ConfluencePage(
@@ -76,24 +76,24 @@ async def test_process_space_refinement_error_handling():
         mock_get.return_value = [page]
 
         with patch(
-            "src.confluence_summarizer.services.rag.ingest_page", new_callable=AsyncMock
+            "src.services.rag.ingest_page", new_callable=AsyncMock
         ):
             with patch(
-                "src.confluence_summarizer.tasks._perform_refinement",
+                "src.tasks._perform_refinement",
                 side_effect=Exception("test failure"),
             ):
                 with patch(
-                    "src.confluence_summarizer.tasks.save_jobs_bulk",
+                    "src.tasks.save_jobs_bulk",
                     new_callable=AsyncMock,
                 ) as mock_save_bulk:
                     with patch(
-                        "src.confluence_summarizer.tasks.save_job",
+                        "src.tasks.save_job",
                         new_callable=AsyncMock,
                     ) as mock_save:
                         import asyncio
 
-                        from src.confluence_summarizer.deps import background_tasks_set
-                        from src.confluence_summarizer.tasks import (
+                        from src.deps import background_tasks_set
+                        from src.tasks import (
                             process_space_refinement,
                         )
 

@@ -7,7 +7,7 @@ from fastapi.security import APIKeyHeader
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from src.confluence_summarizer.config import settings
+from src.config import settings
 
 # Concurrency limits for background tasks
 refinement_semaphore = asyncio.Semaphore(settings.REFINEMENT_CONCURRENCY)
