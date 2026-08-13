@@ -1,7 +1,7 @@
 import pytest
 
-from src.confluence_summarizer.database import save_job_sync
-from src.confluence_summarizer.models.domain import RefinementJob, RefinementStatus
+from src.database import save_job_sync
+from src.models.domain import RefinementJob, RefinementStatus
 
 
 def test_save_job_sync_missing_id():

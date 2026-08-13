@@ -7,11 +7,11 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.database import init_db
-from src.confluence_summarizer.deps import limiter
-from src.confluence_summarizer.routes import router
-from src.confluence_summarizer.services import confluence
+from src.config import settings
+from src.database import init_db
+from src.deps import limiter
+from src.routes import router
+from src.services import confluence
 
 load_dotenv("secrets/.env")
 

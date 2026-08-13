@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
-    uses: juninmd/base-actions/.github/workflows/reusable-validate.yml@main
+    uses: juninmd/base-actions/.github/workflows/reusable-validate.yml@fc51fbba3fb79c24567294e1871eb12a451feeba
     with:
       python-version: ${{ matrix.python-version }}
     secrets:

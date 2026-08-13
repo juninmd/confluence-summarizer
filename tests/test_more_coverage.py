@@ -4,13 +4,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from src.confluence_summarizer.models.domain import (
+from src.models.domain import (
     ConfluencePage,
     RefinementJob,
     RefinementStatus,
 )
-from src.confluence_summarizer.services import confluence, rag
-from src.confluence_summarizer.tasks import (
+from src.services import confluence, rag
+from src.tasks import (
     _perform_refinement,
     process_space_refinement,
 )
@@ -19,7 +19,7 @@ from src.confluence_summarizer.tasks import (
 @pytest.fixture
 def mock_chroma():
     with patch(
-        "src.confluence_summarizer.services.rag._get_collection"
+        "src.services.rag._get_collection"
     ) as mock_get_col:
         mock_col = MagicMock()
         mock_col.query.return_value = {"documents": [["doc1"]]}
@@ -62,7 +62,7 @@ async def test_perform_refinement_error_handling(caplog):
     page = ConfluencePage(id="1", title="T", space_key="S", body="body")
 
     with patch(
-        "src.confluence_summarizer.services.rag.query_context", new_callable=AsyncMock
+        "src.services.rag.query_context", new_callable=AsyncMock
     ) as m_query:
         m_query.side_effect = Exception("Mock RAG Error")
         await _perform_refinement(job, page)
@@ -77,7 +77,7 @@ async def test_process_space_refinement_exception(caplog):
     caplog.set_level(logging.ERROR)
 
     with patch(
-        "src.confluence_summarizer.services.confluence.get_pages_from_space",
+        "src.services.confluence.get_pages_from_space",
         new_callable=AsyncMock,
     ) as m_get:
         m_get.side_effect = Exception("Space API Error")
@@ -89,7 +89,7 @@ async def test_process_space_refinement_exception(caplog):
 @pytest.mark.asyncio
 async def test_get_pages_pagination_no_links(mock_chroma):
     with patch(
-        "src.confluence_summarizer.services.confluence._get_client"
+        "src.services.confluence._get_client"
     ) as m_client_getter:
         m_client = AsyncMock()
         m_client_getter.return_value = m_client
@@ -107,7 +107,7 @@ async def test_get_pages_pagination_no_links(mock_chroma):
 @pytest.mark.asyncio
 async def test_update_page_failure(mock_chroma):
     with patch(
-        "src.confluence_summarizer.services.confluence._get_client"
+        "src.services.confluence._get_client"
     ) as m_client_getter:
         m_client = AsyncMock()
         m_client_getter.return_value = m_client
@@ -126,7 +126,7 @@ async def test_update_page_failure(mock_chroma):
 
 @pytest.mark.asyncio
 async def test_rag_query_context_redis_cache():
-    with patch("src.confluence_summarizer.services.rag._get_redis") as mock_get_redis:
+    with patch("src.services.rag._get_redis") as mock_get_redis:
         mock_redis = AsyncMock()
         mock_get_redis.return_value = mock_redis
 
@@ -140,7 +140,7 @@ async def test_rag_query_context_redis_cache():
         mock_redis.reset_mock()
         mock_redis.get.return_value = None
         with patch(
-            "src.confluence_summarizer.services.rag._query_context"
+            "src.services.rag._query_context"
         ) as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_miss")
@@ -151,7 +151,7 @@ async def test_rag_query_context_redis_cache():
 
 @pytest.mark.asyncio
 async def test_get_redis_client():
-    from src.confluence_summarizer.config import settings
+    from src.config import settings
 
     original_url = settings.REDIS_URL
 
@@ -161,7 +161,7 @@ async def test_get_redis_client():
             settings.REDIS_URL = "redis://localhost:6379"
 
             # Clear global to test initialization
-            import src.confluence_summarizer.services.rag as rag_module
+            import src.services.rag as rag_module
 
             rag_module._redis_client = None
 
@@ -171,7 +171,7 @@ async def test_get_redis_client():
 
     finally:
         # Cleanup
-        import src.confluence_summarizer.services.rag as rag_module
+        import src.services.rag as rag_module
 
         settings.REDIS_URL = original_url
         rag_module._redis_client = None
@@ -179,14 +179,14 @@ async def test_get_redis_client():
 
 @pytest.mark.asyncio
 async def test_rag_query_context_redis_cache_exceptions():
-    with patch("src.confluence_summarizer.services.rag._get_redis") as mock_get_redis:
+    with patch("src.services.rag._get_redis") as mock_get_redis:
         mock_redis = AsyncMock()
         mock_get_redis.return_value = mock_redis
 
         # Test Cache Read Exception
         mock_redis.get.side_effect = Exception("Redis Read Error")
         with patch(
-            "src.confluence_summarizer.services.rag._query_context"
+            "src.services.rag._query_context"
         ) as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_read_err")
@@ -199,7 +199,7 @@ async def test_rag_query_context_redis_cache_exceptions():
         mock_redis.get.return_value = None
         mock_redis.setex.side_effect = Exception("Redis Write Error")
         with patch(
-            "src.confluence_summarizer.services.rag._query_context"
+            "src.services.rag._query_context"
         ) as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_write_err")

@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from src.confluence_summarizer.agents import common
-from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.models.domain import ConfluencePage
-from src.confluence_summarizer.services import confluence
+from src.agents import common
+from src.config import settings
+from src.models.domain import ConfluencePage
+from src.services import confluence
 
 
 @pytest.fixture
