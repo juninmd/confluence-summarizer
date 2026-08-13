@@ -4,7 +4,7 @@ from typing import Optional
 
 from openai import AsyncOpenAI
 
-from src.confluence_summarizer.config import settings
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 

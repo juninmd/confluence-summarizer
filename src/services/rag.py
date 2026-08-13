@@ -9,8 +9,8 @@ import redis.asyncio as redis
 from chromadb.api.types import Metadata
 from chromadb.config import Settings as ChromaSettings
 
-from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.models.domain import ConfluencePage
+from src.config import settings
+from src.models.domain import ConfluencePage
 
 logger = logging.getLogger(__name__)
 

@@ -4,11 +4,11 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 
-from src.confluence_summarizer.database import get_job, save_job
-from src.confluence_summarizer.deps import get_api_key, limiter
-from src.confluence_summarizer.models.domain import RefinementJob, RefinementStatus
-from src.confluence_summarizer.services import confluence
-from src.confluence_summarizer.tasks import (
+from src.database import get_job, save_job
+from src.deps import get_api_key, limiter
+from src.models.domain import RefinementJob, RefinementStatus
+from src.services import confluence
+from src.tasks import (
     process_refinement_job,
     process_space_refinement,
 )

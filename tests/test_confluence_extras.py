@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.services import confluence
+from src.config import settings
+from src.services import confluence
 
 
 def test_get_auth_success():

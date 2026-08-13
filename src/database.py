@@ -3,8 +3,8 @@ import logging
 import sqlite3
 from typing import List, Optional
 
-from src.confluence_summarizer.config import settings
-from src.confluence_summarizer.models.domain import RefinementJob, RefinementStatus
+from src.config import settings
+from src.models.domain import RefinementJob, RefinementStatus
 
 logger = logging.getLogger(__name__)
 

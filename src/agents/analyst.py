@@ -3,11 +3,11 @@ from typing import List
 
 import pydantic
 
-from src.confluence_summarizer.agents.common import (
+from src.agents.common import (
     clean_json_response,
     generate_response,
 )
-from src.confluence_summarizer.models.domain import AnalysisResult
+from src.models.domain import AnalysisResult
 
 
 async def analyze_content(original_text: str, context: List[str]) -> AnalysisResult:

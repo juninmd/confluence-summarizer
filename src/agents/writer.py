@@ -1,7 +1,7 @@
 from typing import List
 
-from src.confluence_summarizer.agents.common import generate_response
-from src.confluence_summarizer.models.domain import AnalysisResult
+from src.agents.common import generate_response
+from src.models.domain import AnalysisResult
 
 
 async def rewrite_content(

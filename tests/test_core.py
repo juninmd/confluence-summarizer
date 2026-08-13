@@ -2,15 +2,15 @@ from unittest.mock import patch
 
 import pytest
 
-from src.confluence_summarizer.agents import analyst, reviewer, writer
-from src.confluence_summarizer.agents.common import clean_json_response
-from src.confluence_summarizer.models.domain import (
+from src.agents import analyst, reviewer, writer
+from src.agents.common import clean_json_response
+from src.models.domain import (
     AnalysisResult,
     Critique,
     CritiqueSeverity,
     RefinementStatus,
 )
-from src.confluence_summarizer.services import rag
+from src.services import rag
 
 
 @pytest.mark.asyncio
@@ -25,7 +25,7 @@ async def test_analyst_agent_parses_json():
     ```"""
 
     with patch(
-        "src.confluence_summarizer.agents.analyst.generate_response",
+        "src.agents.analyst.generate_response",
         return_value=mock_response,
     ):
         result = await analyst.analyze_content(original_text, ["Context 1"])
@@ -40,7 +40,7 @@ async def test_analyst_agent_parses_json():
 @pytest.mark.asyncio
 async def test_analyst_agent_fallback_on_error():
     with patch(
-        "src.confluence_summarizer.agents.analyst.generate_response",
+        "src.agents.analyst.generate_response",
         return_value="invalid json",
     ):
         result = await analyst.analyze_content("text", [])
@@ -60,7 +60,7 @@ async def test_writer_agent_returns_text():
     )
 
     with patch(
-        "src.confluence_summarizer.agents.writer.generate_response",
+        "src.agents.writer.generate_response",
         return_value=mock_rewritten,
     ):
         result = await writer.rewrite_content("old text", critiques, ["context"])
@@ -73,7 +73,7 @@ async def test_reviewer_agent_parses_status():
     critiques = AnalysisResult(critiques=[])
 
     with patch(
-        "src.confluence_summarizer.agents.reviewer.generate_response",
+        "src.agents.reviewer.generate_response",
         return_value=mock_response,
     ):
         result = await reviewer.review_content("old text", "new text", critiques)
@@ -87,7 +87,7 @@ async def test_reviewer_agent_handles_failed_status():
     critiques = AnalysisResult(critiques=[])
 
     with patch(
-        "src.confluence_summarizer.agents.reviewer.generate_response",
+        "src.agents.reviewer.generate_response",
         return_value=mock_response,
     ):
         result = await reviewer.review_content("old text", "new text", critiques)
@@ -100,7 +100,7 @@ async def test_reviewer_agent_fallback_on_error():
     critiques = AnalysisResult(critiques=[])
 
     with patch(
-        "src.confluence_summarizer.agents.reviewer.generate_response",
+        "src.agents.reviewer.generate_response",
         return_value="not json",
     ):
         result = await reviewer.review_content("old text", "new text", critiques)
@@ -122,7 +122,7 @@ def test_clean_json_response():
 async def test_writer_agent_raises_value_error_on_empty():
     critiques = AnalysisResult(critiques=[])
     with patch(
-        "src.confluence_summarizer.agents.writer.generate_response", return_value=""
+        "src.agents.writer.generate_response", return_value=""
     ):
         with pytest.raises(ValueError, match="empty response"):
             await writer.rewrite_content("old text", critiques, ["context"])
@@ -134,7 +134,7 @@ async def test_reviewer_agent_handles_unknown_status():
     critiques = AnalysisResult(critiques=[])
 
     with patch(
-        "src.confluence_summarizer.agents.reviewer.generate_response",
+        "src.agents.reviewer.generate_response",
         return_value=mock_response,
     ):
         result = await reviewer.review_content("old text", "new text", critiques)
@@ -144,8 +144,8 @@ async def test_reviewer_agent_handles_unknown_status():
 
 @pytest.mark.asyncio
 async def test_agents_common_missing_api_key():
-    from src.confluence_summarizer.agents import common
-    from src.confluence_summarizer.config import settings
+    from src.agents import common
+    from src.config import settings
 
     # Force reset
     common._openai_client = None
@@ -165,8 +165,8 @@ async def test_agents_common_missing_api_key():
 
 @pytest.mark.asyncio
 async def test_agents_common_with_api_key():
-    from src.confluence_summarizer.agents import common
-    from src.confluence_summarizer.config import settings
+    from src.agents import common
+    from src.config import settings
 
     # Force reset
     common._openai_client = None
@@ -199,7 +199,7 @@ async def test_agents_common_with_api_key():
 
         # We need to test the generate_response directly bypassing mock patch
         with patch(
-            "src.confluence_summarizer.agents.common._get_client",
+            "src.agents.common._get_client",
             return_value=MockClient(),
         ):
             res = await common.generate_response("prompt", "system")
@@ -214,7 +214,7 @@ async def test_agents_common_with_api_key():
 
 
 def test_rag_ingest_page_delete_error():
-    from src.confluence_summarizer.models.domain import ConfluencePage
+    from src.models.domain import ConfluencePage
 
     page = ConfluencePage(
         id="1", title="test", space_key="T", body="test body", url="x"
@@ -229,10 +229,10 @@ def test_rag_ingest_page_delete_error():
             pass
 
     with patch(
-        "src.confluence_summarizer.services.rag._get_collection",
+        "src.services.rag._get_collection",
         return_value=MockCollection(),
     ):
-        with patch("src.confluence_summarizer.services.rag.logger") as mock_logger:
+        with patch("src.services.rag.logger") as mock_logger:
             # Should catch exception and not raise
             rag._ingest_page(page)
             mock_logger.warning.assert_called_once()
@@ -241,7 +241,7 @@ def test_rag_ingest_page_delete_error():
 def test_rag_get_collection_init():
     import chromadb
 
-    import src.confluence_summarizer.services.rag as rag_module
+    import src.services.rag as rag_module
 
     rag_module._chroma_client = None
     rag_module._collection = None

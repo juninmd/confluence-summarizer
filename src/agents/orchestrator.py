@@ -1,9 +1,9 @@
 import logging
 from typing import List
 
-from src.confluence_summarizer.agents import analyst, reviewer, writer
-from src.confluence_summarizer.models.domain import AnalysisResult, RefinementStatus
-from src.confluence_summarizer.agents.reviewer import ReviewResult
+from src.agents import analyst, reviewer, writer
+from src.models.domain import AnalysisResult, RefinementStatus
+from src.agents.reviewer import ReviewResult
 
 logger = logging.getLogger(__name__)
 

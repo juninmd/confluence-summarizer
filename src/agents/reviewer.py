@@ -2,11 +2,11 @@ import json
 
 from pydantic import BaseModel, Field, ValidationError
 
-from src.confluence_summarizer.agents.common import (
+from src.agents.common import (
     clean_json_response,
     generate_response,
 )
-from src.confluence_summarizer.models.domain import AnalysisResult, RefinementStatus
+from src.models.domain import AnalysisResult, RefinementStatus
 
 
 class ReviewResult(BaseModel):

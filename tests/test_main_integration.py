@@ -4,10 +4,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from src.confluence_summarizer import config
-from src.confluence_summarizer.database import init_db, save_job_sync
-from src.confluence_summarizer.main import app
-from src.confluence_summarizer.models.domain import (
+from src import config
+from src.database import init_db, save_job_sync
+from src.main import app
+from src.models.domain import (
     RefinementJob,
     RefinementStatus,
 )
@@ -26,7 +26,7 @@ def setup_db(tmp_path):
 def mock_confluence_client():
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     with patch(
-        "src.confluence_summarizer.services.confluence._get_client",
+        "src.services.confluence._get_client",
         return_value=mock_client,
     ):
         yield mock_client
@@ -36,7 +36,7 @@ def mock_confluence_client():
 async def test_refine_page_endpoint(mock_confluence_client):
     # Mocking background tasks to not actually run for the endpoint test
     with patch(
-        "src.confluence_summarizer.routes.BackgroundTasks.add_task"
+        "src.routes.BackgroundTasks.add_task"
     ) as mock_add_task:
         response = client.post(
             "/refine/test-page-id", headers={"X-API-Key": "dummy-api-key"}
@@ -55,7 +55,7 @@ async def test_refine_page_endpoint(mock_confluence_client):
 @pytest.mark.asyncio
 async def test_refine_space_endpoint():
     with patch(
-        "src.confluence_summarizer.routes.BackgroundTasks.add_task"
+        "src.routes.BackgroundTasks.add_task"
     ) as mock_add_task:
         response = client.post(
             "/refine/space/TESTSPACE", headers={"X-API-Key": "dummy-api-key"}
