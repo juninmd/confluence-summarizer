@@ -18,9 +18,7 @@ from src.tasks import (
 
 @pytest.fixture
 def mock_chroma():
-    with patch(
-        "src.services.rag._get_collection"
-    ) as mock_get_col:
+    with patch("src.services.rag._get_collection") as mock_get_col:
         mock_col = MagicMock()
         mock_col.query.return_value = {"documents": [["doc1"]]}
         mock_get_col.return_value = mock_col
@@ -61,9 +59,7 @@ async def test_perform_refinement_error_handling(caplog):
     job = RefinementJob(id="job1", page_id="1", status=RefinementStatus.PENDING)
     page = ConfluencePage(id="1", title="T", space_key="S", body="body")
 
-    with patch(
-        "src.services.rag.query_context", new_callable=AsyncMock
-    ) as m_query:
+    with patch("src.services.rag.query_context", new_callable=AsyncMock) as m_query:
         m_query.side_effect = Exception("Mock RAG Error")
         await _perform_refinement(job, page)
 
@@ -88,9 +84,7 @@ async def test_process_space_refinement_exception(caplog):
 
 @pytest.mark.asyncio
 async def test_get_pages_pagination_no_links(mock_chroma):
-    with patch(
-        "src.services.confluence._get_client"
-    ) as m_client_getter:
+    with patch("src.services.confluence._get_client") as m_client_getter:
         m_client = AsyncMock()
         m_client_getter.return_value = m_client
         m_response = httpx.Response(
@@ -106,9 +100,7 @@ async def test_get_pages_pagination_no_links(mock_chroma):
 
 @pytest.mark.asyncio
 async def test_update_page_failure(mock_chroma):
-    with patch(
-        "src.services.confluence._get_client"
-    ) as m_client_getter:
+    with patch("src.services.confluence._get_client") as m_client_getter:
         m_client = AsyncMock()
         m_client_getter.return_value = m_client
         m_response = httpx.Response(
@@ -139,9 +131,7 @@ async def test_rag_query_context_redis_cache():
         # Test Cache Miss and Write
         mock_redis.reset_mock()
         mock_redis.get.return_value = None
-        with patch(
-            "src.services.rag._query_context"
-        ) as mock_query:
+        with patch("src.services.rag._query_context") as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_miss")
             assert results == ["doc1_db"]
@@ -185,9 +175,7 @@ async def test_rag_query_context_redis_cache_exceptions():
 
         # Test Cache Read Exception
         mock_redis.get.side_effect = Exception("Redis Read Error")
-        with patch(
-            "src.services.rag._query_context"
-        ) as mock_query:
+        with patch("src.services.rag._query_context") as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_read_err")
             assert results == ["doc1_db"]
@@ -198,9 +186,7 @@ async def test_rag_query_context_redis_cache_exceptions():
         mock_redis.get.side_effect = None
         mock_redis.get.return_value = None
         mock_redis.setex.side_effect = Exception("Redis Write Error")
-        with patch(
-            "src.services.rag._query_context"
-        ) as mock_query:
+        with patch("src.services.rag._query_context") as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_write_err")
             assert results == ["doc1_db"]

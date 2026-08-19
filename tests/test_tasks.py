@@ -47,9 +47,7 @@ async def test_perform_refinement_no_critiques():
     job = RefinementJob(id="job1", page_id="page1", status=RefinementStatus.PENDING)
     page = ConfluencePage(id="page1", title="Title", space_key="KEY", body="Text")
 
-    with patch(
-        "src.services.rag.query_context", new_callable=AsyncMock
-    ) as mock_query:
+    with patch("src.services.rag.query_context", new_callable=AsyncMock) as mock_query:
         mock_query.return_value = []
         with patch(
             "src.agents.analyst.analyze_content",
@@ -153,9 +151,7 @@ async def test_perform_refinement_exception():
     job = RefinementJob(id="job1", page_id="page1", status=RefinementStatus.PENDING)
     page = ConfluencePage(id="page1", title="Title", space_key="KEY", body="Text")
 
-    with patch(
-        "src.services.rag.query_context", new_callable=AsyncMock
-    ) as m_query:
+    with patch("src.services.rag.query_context", new_callable=AsyncMock) as m_query:
         m_query.side_effect = Exception("RAG Failure")
         await _perform_refinement(job, page)
 
@@ -204,9 +200,7 @@ async def test_process_space_refinement():
             "src.services.confluence.get_pages_from_space",
             new_callable=AsyncMock,
         ) as mock_get_pages,
-        patch(
-            "src.services.rag.ingest_page", new_callable=AsyncMock
-        ) as mock_ingest,
+        patch("src.services.rag.ingest_page", new_callable=AsyncMock) as mock_ingest,
         patch("asyncio.create_task") as mock_create_task,
     ):
         mock_get_pages.return_value = [page]
@@ -297,9 +291,7 @@ async def test_process_space_refinement_ingestion_error():
             "src.services.confluence.get_pages_from_space",
             new_callable=AsyncMock,
         ) as mock_get_pages,
-        patch(
-            "src.services.rag.ingest_page", new_callable=AsyncMock
-        ) as mock_ingest,
+        patch("src.services.rag.ingest_page", new_callable=AsyncMock) as mock_ingest,
     ):
         mock_get_pages.return_value = [page]
         mock_ingest.side_effect = Exception("Ingestion failed")
