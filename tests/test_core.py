@@ -121,9 +121,7 @@ def test_clean_json_response():
 @pytest.mark.asyncio
 async def test_writer_agent_raises_value_error_on_empty():
     critiques = AnalysisResult(critiques=[])
-    with patch(
-        "src.agents.writer.generate_response", return_value=""
-    ):
+    with patch("src.agents.writer.generate_response", return_value=""):
         with pytest.raises(ValueError, match="empty response"):
             await writer.rewrite_content("old text", critiques, ["context"])
 

@@ -75,9 +75,7 @@ async def test_process_space_refinement_error_handling():
         )
         mock_get.return_value = [page]
 
-        with patch(
-            "src.services.rag.ingest_page", new_callable=AsyncMock
-        ):
+        with patch("src.services.rag.ingest_page", new_callable=AsyncMock):
             with patch(
                 "src.tasks._perform_refinement",
                 side_effect=Exception("test failure"),
