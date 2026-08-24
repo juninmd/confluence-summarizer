@@ -8,6 +8,6 @@ permissions:
 
 jobs:
   gitleaks:
-    uses: juninmd/base-actions/.github/workflows/reusable-security-scan.yml@main
+    uses: juninmd/base-actions/.github/workflows/reusable-security-scan.yml@fc51fbba3fb79c24567294e1871eb12a451feeba
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
