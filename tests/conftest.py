@@ -7,7 +7,7 @@ os.environ["OPENAI_API_KEY"] = "dummy-openai-key"
 os.environ["CONFLUENCE_URL"] = "https://dummy.local"
 os.environ["CONFLUENCE_USERNAME"] = "dummy-user"
 os.environ["CONFLUENCE_API_TOKEN"] = "dummy-token"
-os.environ["CHROMA_DB_PATH"] = "./test_chroma_db"
+os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5432/confluence_test"
 os.environ["DB_PATH"] = ":memory:"
 
 

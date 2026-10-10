@@ -13,7 +13,16 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = (
         ""  # Default empty to allow tests and environments without LLM
     )
-    CHROMA_DB_PATH: str = "chroma_db"
+    # OpenAI-compatible endpoints (vLLM, Ollama, TEI...). None = api.openai.com
+    LLM_BASE_URL: str | None = None
+    LLM_MODEL: str = "Qwen/Qwen3-32B"
+    EMBEDDING_BASE_URL: str | None = None
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    EMBEDDING_DIM: int = 1024
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/confluence"
+    BACKUP_DIR: str = "backup"
+    BACKUP_CONCURRENCY: int = 5
+    DUPLICATE_THRESHOLD: float = 0.85
     DB_PATH: str = "jobs.db"
     REDIS_URL: str | None = None
     INGESTION_CONCURRENCY: int = 10

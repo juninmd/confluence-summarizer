@@ -1,0 +1,27 @@
+# `docker compose up -d db`                      -> PostgreSQL + pgvector only
+# `docker compose --profile models up -d`        -> also local LLM + embeddings (needs a GPU)
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: confluence
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  llm:
+    profiles: ["models"]
+    image: vllm/vllm-openai:latest
+    command: ["--model", "Qwen/Qwen3-32B", "--max-model-len", "32768"]
+    ports: ["8000:8000"]
+    deploy: {resources: {reservations: {devices: [{capabilities: [gpu]}]}}}
+
+  embeddings:
+    profiles: ["models"]
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
+    command: ["--model-id", "BAAI/bge-m3"]
+    ports: ["8080:80"]
+    deploy: {resources: {reservations: {devices: [{capabilities: [gpu]}]}}}
+
+volumes:
+  pgdata:

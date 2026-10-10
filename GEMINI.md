@@ -5,7 +5,7 @@ This file serves as the "Living Memory" for the Jules agent working on the Confl
 ## Repository Context
 - **Project:** ConfluenceSummarizer
 - **Purpose:** Ingest, analyze, and refine Confluence documentation using AI agents.
-- **Tech Stack:** Python 3.11/3.12, FastAPI, ChromaDB (RAG), Pydantic, httpx.
+- **Tech Stack:** Python 3.11/3.12, FastAPI, PostgreSQL + pgvector (RAG), Pydantic, httpx.
 - **Dependency Manager:** uv
 - **Testing/Linting:** pytest, pyright (strict), flake8.
 
@@ -17,12 +17,12 @@ This file serves as the "Living Memory" for the Jules agent working on the Confl
 
 ## Learnings
 - **Persistence:** Moved from in-memory dict to SQLite for job storage to prevent data loss.
-- **Async Safety:** RAG operations (ChromaDB) are synchronous and must be wrapped in `asyncio.to_thread` to avoid blocking the FastAPI event loop.
+- **Async Safety:** RAG and backup I/O are fully async (asyncpg, httpx); never call blocking libraries directly in request handlers.
 - **Code Hygiene:** Consolidated duplicate database modules (`db.py` and `database.py`) into `database.py` to avoid confusion and bugs.
 - **Performance:** Ingestion of large spaces should be parallelized (with semaphores) to reduce total time.
 
 ## Verification Log
-- **System Robustness:** Validated complete system architecture including async Confluence ingestion (with pagination/retries), ChromaDB RAG implementation (with cross-checking), and Multi-Agent workflow (Analyst, Writer, Reviewer). All strict type checks (`pyright`) and linting (`flake8`) passed.
+- **System Robustness:** Validated complete system architecture including async Confluence ingestion (with pagination/retries), pgvector RAG implementation (with cross-checking), and Multi-Agent workflow (Analyst, Writer, Reviewer). All strict type checks (`pyright`) and linting (`flake8`) passed.
 
 ## Roadmap
 See `agents.md` for the functional roadmap. This file tracks meta-learnings and architectural decisions.

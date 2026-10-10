@@ -9,8 +9,11 @@ from slowapi.errors import RateLimitExceeded
 
 from src.config import settings
 from src.database import init_db
+from src.db.pool import close_pg, init_pg
 from src.deps import limiter
 from src.routes import router
+from src.routes_backup import router as backup_router
+from src.routes_curation import router as curation_router
 from src.services import confluence
 
 load_dotenv("secrets/.env")
@@ -26,11 +29,13 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing application...")
     init_db()
+    await init_pg()
     await confluence.init_client()
     yield
     # Shutdown
     logger.info("Shutting down application...")
     await confluence.close_client()
+    await close_pg()
 
 
 app = FastAPI(
@@ -71,3 +76,5 @@ async def add_security_headers(
 
 
 app.include_router(router)
+app.include_router(backup_router)
+app.include_router(curation_router)

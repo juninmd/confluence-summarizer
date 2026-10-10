@@ -9,7 +9,7 @@ This document describes the chain of responsibility and personas for the agents 
    - Handles pagination, rate limits, and cleans up raw HTML/Wiki markup.
 
 2. **Retriever (Service/RAG)**
-   - Indexes text chunks into a vector database (ChromaDB).
+   - Indexes text chunks into a vector database (pgvector).
    - Provides relevant context for a given page to check for inconsistencies and overall coherence.
 
 3. **Analyst Agent**

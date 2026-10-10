@@ -1,21 +1,17 @@
-import asyncio
 import hashlib
 import json
 import logging
-from typing import Any, List, Optional, cast
+from typing import List, Optional, cast
 
-import chromadb
 import redis.asyncio as redis
-from chromadb.api.types import Metadata
-from chromadb.config import Settings as ChromaSettings
 
 from src.config import settings
+from src.db.pool import get_pool, to_vector
 from src.models.domain import ConfluencePage
+from src.services.embeddings import embed_texts
 
 logger = logging.getLogger(__name__)
 
-_chroma_client = None
-_collection = None
 _redis_client: Optional[redis.Redis] = None  # type: ignore
 
 
@@ -24,18 +20,6 @@ def _get_redis() -> Optional[redis.Redis]:  # type: ignore
     if _redis_client is None and settings.REDIS_URL:
         _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
     return _redis_client
-
-
-def _get_collection() -> Any:
-    global _chroma_client, _collection
-    if _chroma_client is None:
-        _chroma_client = chromadb.PersistentClient(
-            path=settings.CHROMA_DB_PATH, settings=ChromaSettings(allow_reset=True)
-        )
-        _collection = _chroma_client.get_or_create_collection(
-            name="confluence_pages", metadata={"hnsw:space": "cosine"}
-        )
-    return _collection
 
 
 def chunk_text(text: str, max_chunk_size: int = 1000, overlap: int = 100) -> List[str]:
@@ -76,70 +60,47 @@ def chunk_text(text: str, max_chunk_size: int = 1000, overlap: int = 100) -> Lis
     return [c for c in chunks if c]
 
 
-def _ingest_page(page: ConfluencePage) -> None:
-    """Synchronous function to ingest a single page into ChromaDB.
+async def ingest_page(page: ConfluencePage, text: Optional[str] = None) -> None:
+    """Replace a page's chunks in pgvector (idempotent re-ingestion).
 
     Args:
         page: The Confluence page to ingest.
+        text: Text to index; defaults to the page body (backup passes Markdown).
     """
-    col = _get_collection()
-    try:
-        # First, delete existing chunks for this page to prevent duplication on re-ingestion
-        col.delete(where={"page_id": page.id})
-    except Exception as e:
-        logger.warning(f"Failed to delete existing chunks for page {page.id}: {e}")
-
-    chunks = chunk_text(page.body)
-    if not chunks:
-        return
-
-    ids = [f"{page.id}_chunk_{i}" for i in range(len(chunks))]
-    metadatas: List[Metadata] = [
-        {
-            "page_id": str(page.id),
-            "title": str(page.title),
-            "space_key": str(page.space_key),
-            "chunk_index": i,
-        }
-        for i in range(len(chunks))
+    chunks = chunk_text(page.body if text is None else text)
+    vectors = await embed_texts(chunks) if chunks else []
+    rows = [
+        (page.id, i, page.space_key, chunk, to_vector(vec))
+        for i, (chunk, vec) in enumerate(zip(chunks, vectors))
     ]
-
-    # Type hinting workaround for ChromaDB metadatas
-    col.add(documents=chunks, metadatas=metadatas, ids=ids)
-
-
-async def ingest_page(page: ConfluencePage) -> None:
-    """Asynchronously ingest a page into ChromaDB using a thread pool.
-
-    Args:
-        page: The Confluence page to ingest.
-    """
-    await asyncio.to_thread(_ingest_page, page)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute("DELETE FROM chunks WHERE page_id = $1", page.id)
+            if rows:
+                await conn.executemany(
+                    "INSERT INTO chunks (page_id, chunk_index, space_key, content, embedding) "
+                    "VALUES ($1, $2, $3, $4, $5::text::vector)",
+                    rows,
+                )
 
 
-def _query_context(query_text: str, n_results: int = 5) -> List[str]:
-    """Synchronous function to query ChromaDB for context.
-
-    Args:
-        query_text: The text query to search for.
-        n_results: Number of results to return.
-
-    Returns:
-        A list of matching documents.
-    """
-    col = _get_collection()
-    results = col.query(query_texts=[query_text], n_results=n_results)
-
-    documents = results.get("documents", [])
-    if documents and len(documents) > 0:
-        return documents[
-            0
-        ]  # Return the first list of documents (for the single query text)
-    return []
+async def _query_context(query_text: str, n_results: int = 5) -> List[str]:
+    """Return the n closest chunks by cosine distance."""
+    # Embedding models have bounded context; the head of a page is representative
+    [vector] = await embed_texts([query_text[:4000]])
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        records = await conn.fetch(
+            "SELECT content FROM chunks ORDER BY embedding <=> $1::text::vector LIMIT $2",
+            to_vector(vector),
+            n_results,
+        )
+    return [r["content"] for r in records]
 
 
 async def query_context(query_text: str, n_results: int = 5) -> List[str]:
-    """Asynchronously query context from ChromaDB using a thread pool, with Redis caching.
+    """Query context from pgvector, with optional Redis caching.
 
     Args:
         query_text: The text query to search for.
@@ -162,8 +123,7 @@ async def query_context(query_text: str, n_results: int = 5) -> List[str]:
         except Exception as e:
             logger.warning(f"Redis cache read error: {e}")
 
-    # Fallback to database
-    results = await asyncio.to_thread(_query_context, query_text, n_results)
+    results = await _query_context(query_text, n_results)
 
     if redis_client and cache_key is not None:
         try:
