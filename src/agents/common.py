@@ -14,11 +14,13 @@ _openai_client: Optional[AsyncOpenAI] = None
 def _get_client() -> Optional[AsyncOpenAI]:
     global _openai_client
     if _openai_client is None:
-        if not settings.OPENAI_API_KEY:
+        # A self-hosted OpenAI-compatible server (vLLM/Ollama) needs no real key
+        if not settings.OPENAI_API_KEY and not settings.LLM_BASE_URL:
             logger.warning("OPENAI_API_KEY not set. LLM capabilities will be disabled.")
             return None
         _openai_client = AsyncOpenAI(
-            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.LLM_BASE_URL,
+            api_key=settings.OPENAI_API_KEY or "not-needed",
             max_retries=2,
         )
     return _openai_client
@@ -27,7 +29,7 @@ def _get_client() -> Optional[AsyncOpenAI]:
 async def generate_response(
     prompt: str,
     system_prompt: str,
-    model: str = "gpt-4-turbo-preview",
+    model: Optional[str] = None,
     temperature: float = 0.7,
 ) -> str:
     """Helper function to generate a response from OpenAI's Chat API.
@@ -35,7 +37,7 @@ async def generate_response(
     Args:
         prompt (str): The user prompt to send to the model.
         system_prompt (str): The system instruction prompt.
-        model (str): The LLM model to use.
+        model (Optional[str]): The LLM model; defaults to settings.LLM_MODEL.
         temperature (float): The generation temperature.
 
     Returns:
@@ -50,7 +52,7 @@ async def generate_response(
         )
 
     response = await client.chat.completions.create(
-        model=model,
+        model=model or settings.LLM_MODEL,
         temperature=temperature,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -58,8 +60,9 @@ async def generate_response(
         ],
     )
 
-    content = response.choices[0].message.content
-    return content if content else ""
+    content = response.choices[0].message.content or ""
+    # Reasoning models (e.g. Qwen3) may prepend a <think> block to the answer
+    return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
 
 
 def clean_json_response(raw_text: str) -> str:

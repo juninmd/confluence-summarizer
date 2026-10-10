@@ -57,7 +57,7 @@ The `.github/workflows/ci.yml` file is configured to run:
 ## 5. Source Code
 
 The source code is located in `src/confluence_summarizer/` and follows the architecture:
-- **Services**: `confluence.py` (Ingestion), `rag.py` (Retrieval/ChromaDB).
+- **Services**: `confluence.py` (Ingestion), `rag.py` (Retrieval/pgvector).
 - **Agents**: `analyst.py`, `writer.py`, `reviewer.py`.
 - **API**: `main.py` (FastAPI).
 

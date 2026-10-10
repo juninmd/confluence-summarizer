@@ -50,8 +50,12 @@ async def review_content(
     )
 
     response = await generate_response(prompt=prompt, system_prompt=system_prompt)
-    cleaned_json = clean_json_response(response)
+    return parse_review(response)
 
+
+def parse_review(response: str) -> ReviewResult:
+    """Parse the Reviewer's JSON answer; anything unparseable counts as a rejection."""
+    cleaned_json = clean_json_response(response)
     try:
         data = json.loads(cleaned_json)
         status_str = data.get("status", "pending").lower()

@@ -15,6 +15,8 @@ from src.models.domain import (
 async def test_lifespan():
     with (
         patch("src.main.init_db") as mock_init_db,
+        patch("src.main.init_pg", new_callable=AsyncMock) as mock_init_pg,
+        patch("src.main.close_pg", new_callable=AsyncMock) as mock_close_pg,
         patch(
             "src.services.confluence.init_client",
             new_callable=AsyncMock,
@@ -26,9 +28,11 @@ async def test_lifespan():
     ):
         async with lifespan(app):
             mock_init_db.assert_called_once()
+            mock_init_pg.assert_awaited_once()
             mock_init_client.assert_awaited_once()
 
         mock_close_client.assert_awaited_once()
+        mock_close_pg.assert_awaited_once()
 
 
 @pytest.mark.asyncio

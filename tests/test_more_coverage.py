@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -10,6 +10,7 @@ from src.models.domain import (
     RefinementStatus,
 )
 from src.services import confluence, rag
+from tests.fakes import FakePool
 from src.tasks import (
     _perform_refinement,
     process_space_refinement,
@@ -18,11 +19,17 @@ from src.tasks import (
 
 @pytest.fixture
 def mock_chroma():
-    with patch("src.services.rag._get_collection") as mock_get_col:
-        mock_col = MagicMock()
-        mock_col.query.return_value = {"documents": [["doc1"]]}
-        mock_get_col.return_value = mock_col
-        yield mock_col
+    """Fake pgvector pool + embeddings (name kept for the unrelated tests using it)."""
+    from src.db import pool
+
+    fake = FakePool()
+    pool._pool = fake  # type: ignore[assignment]
+    with patch(
+        "src.services.rag.embed_texts",
+        new=AsyncMock(side_effect=lambda texts: [[0.1, 0.2] for _ in texts]),
+    ):
+        yield fake.conn
+    pool._pool = None
 
 
 @pytest.mark.asyncio
@@ -30,25 +37,33 @@ async def test_rag_ingest_page(mock_chroma):
     page = ConfluencePage(id="1", title="T", space_key="S", body="body")
     await rag.ingest_page(page)
 
-    assert mock_chroma.delete.called
-    assert mock_chroma.add.called
+    assert "DELETE FROM chunks WHERE page_id = $1" in mock_chroma.sql("execute")
+    rows = mock_chroma.calls[-1][2][0]
+    assert rows == [("1", 0, "S", "body", "[0.1,0.2]")]
 
-    # Test empty body
+    # Explicit text (the backup indexes Markdown, not the HTML body)
+    mock_chroma.calls.clear()
+    await rag.ingest_page(page, text="markdown text")
+    assert mock_chroma.calls[-1][2][0][0][3] == "markdown text"
+
+    # Empty body: old chunks are removed, nothing is inserted
     page_empty = ConfluencePage(id="2", title="T", space_key="S", body="")
-    mock_chroma.reset_mock()
+    mock_chroma.calls.clear()
     await rag.ingest_page(page_empty)
-    assert not mock_chroma.add.called
+    assert mock_chroma.sql("executemany") == []
+    assert len(mock_chroma.sql("execute")) == 1
 
 
 @pytest.mark.asyncio
 async def test_rag_query_context(mock_chroma):
+    mock_chroma.rows = [{"content": "doc1"}]
     results = await rag.query_context("query")
     assert results == ["doc1"]
+    assert "<=>" in mock_chroma.sql("fetch")[0]
 
 
 @pytest.mark.asyncio
 async def test_rag_query_context_empty(mock_chroma):
-    mock_chroma.query.return_value = {"documents": []}
     results = await rag.query_context("query")
     assert results == []
 
@@ -131,7 +146,7 @@ async def test_rag_query_context_redis_cache():
         # Test Cache Miss and Write
         mock_redis.reset_mock()
         mock_redis.get.return_value = None
-        with patch("src.services.rag._query_context") as mock_query:
+        with patch("src.services.rag._query_context", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_miss")
             assert results == ["doc1_db"]
@@ -175,7 +190,7 @@ async def test_rag_query_context_redis_cache_exceptions():
 
         # Test Cache Read Exception
         mock_redis.get.side_effect = Exception("Redis Read Error")
-        with patch("src.services.rag._query_context") as mock_query:
+        with patch("src.services.rag._query_context", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_read_err")
             assert results == ["doc1_db"]
@@ -186,7 +201,7 @@ async def test_rag_query_context_redis_cache_exceptions():
         mock_redis.get.side_effect = None
         mock_redis.get.return_value = None
         mock_redis.setex.side_effect = Exception("Redis Write Error")
-        with patch("src.services.rag._query_context") as mock_query:
+        with patch("src.services.rag._query_context", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = ["doc1_db"]
             results = await rag.query_context("query_write_err")
             assert results == ["doc1_db"]

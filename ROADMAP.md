@@ -16,7 +16,7 @@ The core foundation is established, bringing significant initial value. The basi
 
 **Currently, the system is capable of:**
 *   Extracting content securely via the Confluence API.
-*   Vectorizing and retrieving context using ChromaDB (RAG pipeline).
+*   Vectorizing and retrieving context using pgvector (RAG pipeline).
 *   Refining content through a collaborative multi-agent process (Analyst, Writer, Reviewer).
 *   Handling single-page and batch (space-wide) ingestion via FastAPI endpoints.
 

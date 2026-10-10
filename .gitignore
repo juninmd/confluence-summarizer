@@ -20,4 +20,5 @@ config/secrets.yml
 *.db
 *.db-*
 chroma_db/
+backup/
 secrets/.env

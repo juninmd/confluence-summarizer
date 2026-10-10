@@ -211,51 +211,6 @@ async def test_agents_common_with_api_key():
         settings.OPENAI_API_KEY = old_key
 
 
-def test_rag_ingest_page_delete_error():
-    from src.models.domain import ConfluencePage
-
-    page = ConfluencePage(
-        id="1", title="test", space_key="T", body="test body", url="x"
-    )
-
-    # Mock _get_collection to throw when delete is called
-    class MockCollection:
-        def delete(self, where):
-            raise Exception("Delete failed")
-
-        def add(self, documents, metadatas, ids):
-            pass
-
-    with patch(
-        "src.services.rag._get_collection",
-        return_value=MockCollection(),
-    ):
-        with patch("src.services.rag.logger") as mock_logger:
-            # Should catch exception and not raise
-            rag._ingest_page(page)
-            mock_logger.warning.assert_called_once()
-
-
-def test_rag_get_collection_init():
-    import chromadb
-
-    import src.services.rag as rag_module
-
-    rag_module._chroma_client = None
-    rag_module._collection = None
-
-    class MockCollection:
-        pass
-
-    class MockClient:
-        def get_or_create_collection(self, name, metadata):
-            return MockCollection()
-
-    with patch.object(chromadb, "PersistentClient", return_value=MockClient()):
-        col = rag_module._get_collection()
-        assert isinstance(col, MockCollection)
-
-
 def test_chunk_text():
     text = "hello world this is a long text that needs to be chunked"
     # Small chunk size to force splits
