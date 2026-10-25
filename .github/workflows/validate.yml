@@ -1,16 +1,21 @@
 name: Validate
+
 on:
   pull_request:
   push:
     branches: [master]
-concurrency:
-  group: validate-${{ github.ref }}
-  cancel-in-progress: true
+
 jobs:
   check:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+    # Concorrencia por job e por versao: no nivel do workflow, os dois jobs da
+    # matrix caem no mesmo grupo (github.ref) e um cancela o outro — o check
+    # cancelado aparece como required e trava o merge sem log util.
+    concurrency:
+      group: validate-${{ github.ref }}-${{ matrix.python-version }}
+      cancel-in-progress: true
     uses: juninmd/base-actions/.github/workflows/reusable-validate.yml@main
     with:
       python-version: ${{ matrix.python-version }}
