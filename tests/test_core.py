@@ -221,3 +221,13 @@ def test_chunk_text():
 
     # Test empty text
     assert rag.chunk_text("") == []
+
+
+@pytest.mark.parametrize(
+    "max_chunk_size, overlap",
+    [(0, 0), (-1, 0), (10, -1), (10, 10), (10, 20)],
+)
+def test_chunk_text_rejects_invalid_overlap(max_chunk_size, overlap):
+    # overlap >= max_chunk_size made the window never advance (infinite loop)
+    with pytest.raises(ValueError):
+        rag.chunk_text("x" * 30, max_chunk_size=max_chunk_size, overlap=overlap)
