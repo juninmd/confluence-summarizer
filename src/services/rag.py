@@ -33,6 +33,8 @@ def chunk_text(text: str, max_chunk_size: int = 1000, overlap: int = 100) -> Lis
     Returns:
         List of text chunks.
     """
+    if max_chunk_size <= 0 or overlap < 0 or overlap >= max_chunk_size:
+        raise ValueError("require max_chunk_size > 0 and 0 <= overlap < max_chunk_size")
     if not text:
         return []
 

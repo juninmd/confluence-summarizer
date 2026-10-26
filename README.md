@@ -119,7 +119,7 @@ See `agents.md` for detailed agent personas and workflows.
 
 ### Missing Environment Variables
 
-If you see errors related to `OPENAI_API_KEY` or `CONFLUENCE_URL`, ensure your `.env` file is correctly formatted and located in the root directory.
+If you see errors related to `OPENAI_API_KEY` or `CONFLUENCE_URL`, ensure your `secrets/.env` file is correctly formatted (see `src/config.py`).
 
 - **OPENAI_API_KEY / LLM_BASE_URL**: One of them is required for Agent functionality (a self-hosted OpenAI-compatible server needs only `LLM_BASE_URL`). If both are missing, the agents return a mock response.
 - **CONFLUENCE_CREDENTIALS**: Check that `CONFLUENCE_USERNAME` matches your Atlassian email and `CONFLUENCE_API_TOKEN` is a valid API token (not your password).
@@ -141,5 +141,5 @@ uv run pytest --cov=src --cov-report=term-missing
 To run a specific test file:
 
 ```bash
-uv run pytest tests/test_agents.py
+uv run pytest tests/test_core.py
 ```
