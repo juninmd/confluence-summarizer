@@ -5,7 +5,7 @@ from typing import Any, List, Optional
 import httpx
 from tenacity import (
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -16,6 +16,14 @@ from src.models.domain import ConfluencePage
 logger = logging.getLogger(__name__)
 
 _client: Optional[httpx.AsyncClient] = None
+
+
+def is_transient_error(exc: BaseException) -> bool:
+    """Retry network failures, 429 and 5xx; 4xx (404, 401...) will fail again."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        return status == 429 or status >= 500
+    return isinstance(exc, httpx.RequestError)
 
 
 def _get_auth() -> Optional[tuple[str, str]]:
@@ -67,7 +75,7 @@ def clean_html(html_content: str) -> str:
 @retry(
     wait=wait_exponential(multiplier=1, min=2, max=10),
     stop=stop_after_attempt(3),
-    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    retry=retry_if_exception(is_transient_error),
 )
 async def get_page(page_id: str) -> ConfluencePage:
     client = _get_client()
@@ -104,7 +112,7 @@ async def get_page(page_id: str) -> ConfluencePage:
 @retry(
     wait=wait_exponential(multiplier=1, min=2, max=10),
     stop=stop_after_attempt(3),
-    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    retry=retry_if_exception(is_transient_error),
 )
 async def get_pages_from_space(
     space_key: str, limit: Optional[int] = None, page_size: int = 50
@@ -157,7 +165,7 @@ async def get_pages_from_space(
 @retry(
     wait=wait_exponential(multiplier=1, min=2, max=10),
     stop=stop_after_attempt(3),
-    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    retry=retry_if_exception(is_transient_error),
 )
 async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
     """Publish a new version of the page back to Confluence.
