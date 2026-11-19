@@ -33,11 +33,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file="secrets/.env")
 
 
-# For tests or default load, provide empty defaults
-# We intentionally do not use hardcoded passwords, but use a fake string to allow Tests to pass
-settings = Settings(
-    CONFLUENCE_URL="https://dummy.local",
-    CONFLUENCE_USERNAME="dummy-user",
-    CONFLUENCE_API_TOKEN="dummy" + "-" + "token",
-    APP_API_KEY="dummy" + "-" + "api-key",
-)
+# Required fields (CONFLUENCE_*, APP_API_KEY) come from the environment or secrets/.env;
+# tests set them in tests/conftest.py. Never pass them as init kwargs: those would override the env.
+settings = Settings()  # pyright: ignore[reportCallIssue]
