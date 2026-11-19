@@ -89,6 +89,10 @@ uv run python -m src.cli curate DOC --threshold 0.85
    and `EMBEDDING_BASE_URL`/`EMBEDDING_MODEL`/`EMBEDDING_DIM`. The schema (including
    `CREATE EXTENSION vector`) is created on startup; `EMBEDDING_DIM` must match the model.
 
+   `CONFLUENCE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_API_TOKEN` and `APP_API_KEY` are
+   required: the app refuses to start without them. Every endpoint expects the header
+   `X-API-Key: <APP_API_KEY>`.
+
 4. **Run the API**:
    ```bash
    uv run uvicorn src.main:app --reload
