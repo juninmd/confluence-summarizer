@@ -3,20 +3,22 @@
 import urllib.parse
 from typing import Any, AsyncIterator, Dict, List
 
-import httpx
 from tenacity import (
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
 
-from src.services.confluence import _get_client  # pyright: ignore[reportPrivateUsage]
+from src.services.confluence import (
+    _get_client,  # pyright: ignore[reportPrivateUsage]
+    is_transient_error,
+)
 
 _retry = retry(
     wait=wait_exponential(multiplier=1, min=2, max=10),
     stop=stop_after_attempt(3),
-    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    retry=retry_if_exception(is_transient_error),
     reraise=True,
 )
 _EXPAND = "body.storage,version,ancestors,metadata.labels,history"

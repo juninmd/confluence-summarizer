@@ -57,6 +57,36 @@ async def test_get_page_retry_failure(mock_httpx_client):
 
 
 @pytest.mark.asyncio
+async def test_get_page_does_not_retry_client_errors(mock_httpx_client):
+    mock_httpx_client.get.return_value = httpx.Response(
+        status_code=404,
+        json={"message": "not found"},
+        request=httpx.Request("GET", "https://dummy.local"),
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await confluence.get_page("missing")
+
+    assert mock_httpx_client.get.await_count == 1
+
+
+def test_is_transient_error_classification():
+    request = httpx.Request("GET", "https://dummy.local")
+
+    def status_error(code: int) -> httpx.HTTPStatusError:
+        return httpx.HTTPStatusError(
+            "x", request=request, response=httpx.Response(code, request=request)
+        )
+
+    assert confluence.is_transient_error(status_error(429))
+    assert confluence.is_transient_error(status_error(503))
+    assert confluence.is_transient_error(httpx.ConnectError("boom"))
+    assert not confluence.is_transient_error(status_error(404))
+    assert not confluence.is_transient_error(status_error(401))
+    assert not confluence.is_transient_error(ValueError("nope"))
+
+
+@pytest.mark.asyncio
 async def test_get_pages_from_space_pagination(mock_httpx_client):
     page_1 = {
         "results": [
