@@ -82,7 +82,7 @@ async def get_page(page_id: str) -> ConfluencePage:
     # Confluence API v1 to ensure space_key is available as expected
     safe_page_id = urllib.parse.quote(page_id)
     response = await client.get(
-        f"/wiki/rest/api/content/{safe_page_id}?expand=body.storage,space"
+        f"/wiki/rest/api/content/{safe_page_id}?expand=body.storage,space,version"
     )
     response.raise_for_status()
     data = response.json()
