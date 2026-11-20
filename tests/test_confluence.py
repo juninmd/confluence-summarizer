@@ -36,3 +36,28 @@ async def test_get_page_success():
         assert page.version == 1
         assert "pages/12345" in page.url
         mock_client.get.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_transient_error_mid_pagination_retries_only_that_request():
+    """A 503 on page 2 must not refetch page 1 (whole-loop retry did)."""
+    from tenacity import wait_none
+
+    req = httpx.Request("GET", "https://dummy.local")
+    page_1 = {"results": [{"id": "1", "title": "A"}], "_links": {"next": "/p2"}}
+    page_2 = {"results": [{"id": "2", "title": "B"}]}
+    mock_client = AsyncMock()
+    mock_client.get.side_effect = [
+        httpx.Response(200, json=page_1, request=req),
+        httpx.Response(503, request=req),
+        httpx.Response(200, json=page_2, request=req),
+    ]
+
+    with (
+        patch("src.services.confluence._get_client", return_value=mock_client),
+        patch.object(confluence._get_json.retry, "wait", wait_none()),
+    ):
+        pages = await confluence.get_pages_from_space("S")
+
+    assert [p.id for p in pages] == ["1", "2"]
+    assert mock_client.get.call_count == 3

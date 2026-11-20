@@ -72,101 +72,74 @@ def clean_html(html_content: str) -> str:
     return html_content
 
 
-@retry(
+_retry_transient = retry(
     wait=wait_exponential(multiplier=1, min=2, max=10),
     stop=stop_after_attempt(3),
     retry=retry_if_exception(is_transient_error),
 )
-async def get_page(page_id: str) -> ConfluencePage:
-    client = _get_client()
-    # Confluence API v1 to ensure space_key is available as expected
-    safe_page_id = urllib.parse.quote(page_id)
-    response = await client.get(
-        f"/wiki/rest/api/content/{safe_page_id}?expand=body.storage,space"
-    )
+
+
+@_retry_transient
+async def _get_json(url: str) -> Any:
+    response = await _get_client().get(url)
     response.raise_for_status()
-    data = response.json()
+    return response.json()
 
+
+def _to_page(item: Any, space_key: str) -> ConfluencePage:
     body = ""
-    if "body" in data and "storage" in data["body"]:
-        body = clean_html(data["body"]["storage"].get("value", ""))
-
-    space_key = "unknown"
-    if "space" in data and "key" in data["space"]:
-        space_key = data["space"]["key"]
-
-    version = data.get("version", {}).get("number", 1)
-    webui = data.get("_links", {}).get("webui", "")
-    page_url = f"{settings.CONFLUENCE_URL}{webui}" if webui else ""
-
+    if "body" in item and "storage" in item["body"]:
+        body = clean_html(item["body"]["storage"].get("value", ""))
+    webui = item.get("_links", {}).get("webui", "")
     return ConfluencePage(
-        id=str(data["id"]),
-        title=data["title"],
+        id=str(item["id"]),
+        title=item["title"],
         space_key=space_key,
         body=body,
-        version=version,
-        url=page_url,
+        version=item.get("version", {}).get("number", 1),
+        url=f"{settings.CONFLUENCE_URL}{webui}" if webui else "",
     )
 
 
-@retry(
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    stop=stop_after_attempt(3),
-    retry=retry_if_exception(is_transient_error),
-)
+async def get_page(page_id: str) -> ConfluencePage:
+    # Confluence API v1 to ensure space_key is available as expected
+    safe_page_id = urllib.parse.quote(page_id)
+    data = await _get_json(
+        f"/wiki/rest/api/content/{safe_page_id}?expand=body.storage,space,version"
+    )
+    return _to_page(data, data.get("space", {}).get("key", "unknown"))
+
+
 async def get_pages_from_space(
     space_key: str, limit: Optional[int] = None, page_size: int = 50
 ) -> List[ConfluencePage]:
-    client = _get_client()
+    # Retries wrap each request, so a transient error on page N does not
+    # refetch pages 1..N-1.
     pages: List[ConfluencePage] = []
-
     safe_space_key = urllib.parse.quote(space_key)
     url = f"/wiki/rest/api/content?spaceKey={safe_space_key}&expand=body.storage,version&limit={page_size}"
 
     while url:
-        response = await client.get(url)
-        response.raise_for_status()
-        data = response.json()
-
+        data = await _get_json(url)
         for item in data.get("results", []):
-            body = ""
-            if "body" in item and "storage" in item["body"]:
-                body = clean_html(item["body"]["storage"].get("value", ""))
-
-            version = item.get("version", {}).get("number", 1)
-            webui = item.get("_links", {}).get("webui", "")
-            page_url = f"{settings.CONFLUENCE_URL}{webui}" if webui else ""
-
-            pages.append(
-                ConfluencePage(
-                    id=str(item["id"]),
-                    title=item["title"],
-                    space_key=space_key,
-                    body=body,
-                    version=version,
-                    url=page_url,
-                )
-            )
-
+            pages.append(_to_page(item, space_key))
             if limit and len(pages) >= limit:
-                return pages[:limit]
+                return pages
 
-        links = data.get("_links", {})
-        if "next" in links:
-            # The next link might be a relative path without /wiki
-            next_link = links["next"]
-            url = next_link if next_link.startswith("/wiki") else f"/wiki{next_link}"
-        else:
-            url = ""
+        next_link = data.get("_links", {}).get("next")
+        # The next link might be a relative path without /wiki
+        url = (
+            ""
+            if not next_link
+            else next_link
+            if next_link.startswith("/wiki")
+            else f"/wiki{next_link}"
+        )
 
     return pages
 
 
-@retry(
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    stop=stop_after_attempt(3),
-    retry=retry_if_exception(is_transient_error),
-)
+@_retry_transient
 async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
     """Publish a new version of the page back to Confluence.
 
