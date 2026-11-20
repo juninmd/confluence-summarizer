@@ -126,4 +126,7 @@ async def publish_page(request: Request, job_id: str) -> Dict[str, Any]:
         return {"message": "Page published successfully", "page_id": job.page_id}
     except Exception as e:
         logger.exception(f"Failed to publish page for job {job_id}")
-        raise HTTPException(status_code=500, detail=f"Publishing failed: {e}") from e
+        # The exception text can carry the Confluence URL and response body: log it, do not return it.
+        raise HTTPException(
+            status_code=500, detail="Publishing failed: Confluence rejected the update"
+        ) from e
