@@ -3,7 +3,7 @@ name = "confluence-summarizer"
 version = "0.1.0"
 description = "A robust Python system to connect to Confluence API, ingest content into RAG, and use AI agents to analyze, criticize, and rewrite documentation."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 dependencies = [
     "fastapi[all]>=0.111.0",
     "uvicorn>=0.30.0",
@@ -38,7 +38,6 @@ dev = [
     "flake8>=7.0.0",
     "respx>=0.21.1",
     "bandit>=1.7.0",
-    "safety>=3.0.0",
     "typer>=0.21.1",
 ]
 
