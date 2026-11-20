@@ -42,3 +42,25 @@ def test_publish_sends_current_version_plus_one(current_version):
 
     assert response.status_code == 200
     assert upd.call_args.kwargs["version_number"] == current_version + 1
+
+
+def test_publish_failure_does_not_echo_upstream_error():
+    """httpx errors carry the Confluence URL and body; the API must not return them."""
+    job = RefinementJob(
+        id="pub-leak",
+        page_id="page1",
+        status=RefinementStatus.COMPLETED,
+        refined_text="New text",
+    )
+    save_job_sync(job)
+    leak = "Server error '500' for url 'https://intranet.example/wiki/api/v2/pages/1'"
+
+    with patch("src.services.confluence.get_page", new_callable=AsyncMock) as get:
+        get.side_effect = Exception(leak)
+        response = client.post(
+            f"/publish/{job.id}", headers={"X-API-Key": "dummy-api-key"}
+        )
+
+    assert response.status_code == 500
+    assert "intranet.example" not in response.text
+    assert response.json()["detail"].startswith("Publishing failed")
