@@ -115,19 +115,13 @@ async def publish_page(request: Request, job_id: str) -> Dict[str, Any]:
         )
 
     try:
-        # We need the original page to get its current version to increment it
-        # However, for simplicity and since v2 API handles updates, we will fetch it
+        # Confluence rejects an update unless it carries current version + 1.
         current_page = await confluence.get_page(job.page_id)
-
-        # Confluence v2 API doesn't strictly need the version passed this way for all updates,
-        # but the prompt implies we might want to version it. We use an arbitrary bump here or
-        # rely on the backend. For a real system we'd parse the version from get_page, but
-        # this suffices for the re-implementation requested.
         await confluence.update_page(
             page_id=job.page_id,
             title=current_page.title,
             body=job.refined_text,
-            version_number=2,  # Hardcoded bump for demonstration
+            version_number=current_page.version + 1,
         )
         return {"message": "Page published successfully", "page_id": job.page_id}
     except Exception as e:

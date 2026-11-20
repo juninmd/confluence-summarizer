@@ -105,7 +105,7 @@ async def get_page(page_id: str) -> ConfluencePage:
     # Confluence API v1 to ensure space_key is available as expected
     safe_page_id = urllib.parse.quote(page_id)
     data = await _get_json(
-        f"/wiki/rest/api/content/{safe_page_id}?expand=body.storage,space"
+        f"/wiki/rest/api/content/{safe_page_id}?expand=body.storage,space,version"
     )
     return _to_page(data, data.get("space", {}).get("key", "unknown"))
 
