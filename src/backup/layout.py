@@ -141,7 +141,9 @@ def rebase_links(markdown: str, from_dir: str, to_dir: str) -> str:
             return whole
         resolved = posixpath.normpath(posixpath.join(from_dir, target))
         moved = posixpath.relpath(resolved, to_dir or ".")
-        return whole.replace(f"({target})", f"({moved})")
+        # Splice by position: the link text may contain "(target)" too.
+        start, end = match.start(1) - match.start(0), match.end(1) - match.start(0)
+        return whole[:start] + moved + whole[end:]
 
     return _LINK_RE.sub(replace, markdown)
 
