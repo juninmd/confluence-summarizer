@@ -73,3 +73,9 @@ def test_local_links_and_rebase():
     assert "(https://e.io)" in moved and "(#top)" in moved
     back = layout.rebase_links("![i](assets/a.png)", "", "curated")
     assert back == "![i](../assets/a.png)"
+
+
+def test_rebase_links_rewrites_only_the_target_not_the_link_text():
+    md = "See [docs (a.md)](a.md) and ![logo (a.md)](a.md) now"
+    out = layout.rebase_links(md, "space/x", "space/x/y")
+    assert out == "See [docs (a.md)](../a.md) and ![logo (a.md)](../a.md) now"
