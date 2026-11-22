@@ -6,7 +6,7 @@ Confluence Summarizer: a Python service that backs up Confluence spaces to Markd
 
 - Python >= 3.11.5, managed by uv (`uv.lock`), hatchling build
 - FastAPI, Uvicorn, Pydantic and pydantic-settings, Typer CLI
-- PostgreSQL 16 with pgvector (asyncpg). Redis (slowapi rate limit)
+- PostgreSQL 16 with pgvector (asyncpg). Redis is optional (`REDIS_URL`), used by the RAG service
 - Any OpenAI-compatible LLM and embedding endpoint (`LLM_BASE_URL`, `EMBEDDING_BASE_URL`)
 
 ## Commands
