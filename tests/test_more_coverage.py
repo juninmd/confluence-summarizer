@@ -125,10 +125,10 @@ async def test_update_page_failure(mock_chroma):
         )
         m_client.put.return_value = m_response
 
-        from tenacity import RetryError
-
-        with pytest.raises(RetryError):
+        # A 5xx PUT may already be applied: it is surfaced, not resent.
+        with pytest.raises(httpx.HTTPStatusError):
             await confluence.update_page("1", "T", "B", 2)
+        assert m_client.put.await_count == 1
 
 
 @pytest.mark.asyncio
