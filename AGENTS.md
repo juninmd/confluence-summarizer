@@ -1,82 +1,56 @@
-```markdown
-# AGENTS.md - Guidelines for AI Coding Agents
+# AGENTS.md
 
-These guidelines outline the principles and rules for development of AI coding agents within this repository. Adherence to these principles is crucial for maintaining code quality, maintainability, and robustness.
+Confluence Summarizer: a Python service that backs up Confluence spaces to Markdown (with PostgreSQL + pgvector indexing), curates duplicated pages with LLM agents, and refines single pages through an Analyst, Writer and Reviewer flow. Overview and API: [`README.md`](README.md).
 
-## 1. DRY (Don't Repeat Yourself)
+## Stack
 
-*   All functionalities and logic should be encapsulated within separate, well-documented modules and files.
-*   Avoid duplicating code snippets or complex algorithms across multiple files.
-*   When a task can be accomplished with a single, reusable component, implement it as a module.
+- Python >= 3.11.5, managed by uv (`uv.lock`), hatchling build
+- FastAPI, Uvicorn, Pydantic and pydantic-settings, Typer CLI
+- PostgreSQL 16 with pgvector (asyncpg). Redis is optional (`REDIS_URL`), used by the RAG service. slowapi rate-limits the API (`src/deps.py`)
+- Any OpenAI-compatible LLM and embedding endpoint (`LLM_BASE_URL`, `EMBEDDING_BASE_URL`)
 
-## 2. KISS (Keep It Simple, Stupid)
+## Commands
 
-*   Strive for clarity and simplicity in design.
-*   Favor simple solutions over complex ones.
-*   Avoid unnecessary abstraction; keep the core logic easy to understand.
-*   Minimize the complexity of the code base.
+- Install: `uv sync`
+- API: `uv run uvicorn src.main:app --reload`
+- CLI: `uv run python -m src.cli --help`
+- Test: `uv run pytest` (pytest-asyncio in auto mode). PostgreSQL integration tests skip when the database is missing
+- Typecheck: `uv run pyright` (strict; covers `src` and `tests`)
+- Lint: `uv run flake8` (max line 120, `.flake8`)
+- Security scan: `uv run bandit -r src` (dev dependency)
+- Local services: `docker compose up` (pgvector, vLLM, TEI)
 
-## 3. SOLID Principles
+## Structure
 
-*   **Single Responsibility Principle:** Each class or module should have one, and only one, reason to change.
-*   **Open/Closed Principle:** The system should be extensible without being modified.
-*   **Liskov Substitution Principle:** Subclasses must be substitutable for their base class without altering the correctness of the program.
-*   **Interface Segregation Principle:** Clients shouldn't be forced to implement interfaces they don't use.
-*   **Dependency Inversion Principle:** High-level modules should not depend on low-level modules.  Instead, they should depend on abstractions.
+- `src/main.py`: FastAPI app. `src/routes*.py`: HTTP routes (backup, curation, core)
+- `src/cli.py`: Typer CLI
+- `src/backup/`: Confluence to Markdown backup, conversion, layout, verification
+- `src/curation/`: clustering, unification, review queue, export
+- `src/agents/`: Analyst, Writer, Reviewer and orchestrator for single-page refinement
+- `src/services/`: Confluence client, embeddings, RAG. `src/db/`: queries and schema. `src/models/`: domain models
+- `src/config.py`: settings (pydantic-settings). `.env.example` lists the variables
+- `tests/`: pytest suites and fakes (`tests/fakes.py`)
+- `agents.md` (lowercase): architecture of the agent personas. It is a different file from this one
+- `GEMINI.md`: agent memory file. `ROADMAP.md`: planned work
 
-## 4. YAGNI (You Aren't Gonna Need It)
+## Conventions
 
-*   Only implement features that are explicitly required for the current task.
-*   Don't introduce functionality that is not currently needed.
-*   Defer implementation until the task's requirements are fully understood.
+- DRY, KISS, SOLID, YAGNI. Implement only what the task needs.
+- Max 180 lines of code per file. Split by responsibility when a file grows.
+- Docstrings on functions and modules. Comments explain the *why* only.
+- Errors are handled predictably, with informative messages. Log for debugging and monitoring, never log secrets or PII.
+- Treat data as immutable. Version every persisted change.
+- Validate and sanitize external input (Confluence, LLM output, HTTP).
+- Tests: cover critical logic and edge cases. Target: 80% coverage. Coverage is not enforced in `pyproject.toml`.
+- Code must pass `pyright` (strict) and `flake8` before a PR.
 
-## 5. Code Style & Formatting
+## Gotchas
 
-*   Follow the established coding style guidelines [Link to Style Guide - e.g., linters/formatters] as defined in the `style.md` file.
-*   Consistent indentation and spacing are mandatory.
-*   Use descriptive variable and function names.
-*   Adhere to the `formatting.md` file for code formatting.
-
-## 6. File Size Limit (180 Lines Max)
-
-*   Each file should not exceed 180 lines of code.
-*   Code must be properly formatted for readability.
-*   Comments should be concise and explain the *why*, not just the *what*.
-
-## 7. Testing & Coverage
-
-*   All development must be conducted with a focus on thorough unit testing.
-*   Unit tests should cover all critical logic and edge cases.
-*   Aim for at least 80% test coverage across all modules.
-*   Test cases should be clearly documented.
-
-## 8. Implementation Details
-
-*   All algorithmic logic must be clearly expressed and easily understandable.
-*   Data structures used must be appropriately chosen for the task.
-*   Error handling must be robust and predictable.
-*   Utilize appropriate logging to aid in debugging and monitoring.
-
-## 9. Data Management
-
-*   Data should be treated as immutable and serialized when needed for persistence.
-*   Version control should be used for all data-related changes.
-*   Consider data validation and sanitization to prevent errors.
-
-## 10. Maintainability & Documentation
-
-*   Code should be written with readability in mind.
-*   Use docstrings to document functions and modules.
-*   Maintain clear and concise comments explaining complex logic.
-
-## 11.  Requirements & Constraints
-
-*   The AGENTS.md file will document the primary functionalities and potential integrations for the AI coding agents.
-*   The repository will adhere to established data structures and organization.
-*   All code must be compatible with [Specify Version Control System - e.g., Git] and be easily backported.
-
-
-```
+- Configuration comes from environment variables read by `src/config.py`. Copy `.env.example` to `.env` locally. Never commit `.env` or keys.
+- Root CI (`validate.yml`) calls only the reusable validate workflow from `juninmd/base-actions`. Run `pytest`, `pyright` and `flake8` locally before opening a PR.
+- The PostgreSQL tests (`tests/test_pg_integration.py`) skip unless the pgvector database is available.
+- Backups are written under `BACKUP_DIR` (default `backup`). Pages deleted in Confluence stay on disk and are flagged `deleted`.
+- Two agent doc files differ only by case (`AGENTS.md`, `agents.md`). On case-insensitive filesystems they collide. Do not rename either without a plan.
 
 <!-- base-actions-main-policy -->
 ## GitHub Actions — padrão obrigatório (@main)
