@@ -1,6 +1,6 @@
 import logging
 import urllib.parse
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
 import httpx
 from tenacity import (
@@ -72,11 +72,24 @@ def clean_html(html_content: str) -> str:
     return html_content
 
 
-_retry_transient = retry(
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    stop=stop_after_attempt(3),
-    retry=retry_if_exception(is_transient_error),
-)
+def is_unsent_error(exc: BaseException) -> bool:
+    """Failures where Confluence surely did not apply the request (safe to resend a PUT)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code == 429
+    return isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout))
+
+
+def _retry_on(predicate: Callable[[BaseException], bool]):
+    return retry(
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception(predicate),
+    )
+
+
+_retry_transient = _retry_on(is_transient_error)
+# A versioned PUT may be committed before a timeout/5xx; resending it gets 409.
+_retry_unsent = _retry_on(is_unsent_error)
 
 
 @_retry_transient
@@ -139,7 +152,7 @@ async def get_pages_from_space(
     return pages
 
 
-@_retry_transient
+@_retry_unsent
 async def update_page(page_id: str, title: str, body: str, version_number: int) -> Any:
     """Publish a new version of the page back to Confluence.
 
